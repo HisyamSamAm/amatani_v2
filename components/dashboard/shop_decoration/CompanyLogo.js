@@ -16,6 +16,7 @@ import { Loader2 } from 'lucide-react';
 import { Progress } from '@/components/shadcnUi/progress';
 import CompanyLogosPreview from './previewcomponent/CompanyLogoPreview';
 import { AspectRatio } from "@/components/shadcnUi/aspect-ratio";
+import { GetCompanyLogosAction, InsertCompanyLogoAction, DeleteCompanyLogoAction } from "@/app/actions/v2/dashboard/admin/sd/companyLogosActions";
 
 const formSchema = z.object({
     logo: z.any().refine((file) => {
@@ -48,12 +49,12 @@ export default function CompanyLogo() {
     // Fungsi untuk mengambil data company logo dari API
     const fetchCompanyLogoList = async () => {
         try {
-            const response = await fetch('/api/v2/admin/sd/company_logos');
-            if (!response.ok) {
-                throw new Error('Failed to fetch company logo list');
+            const result = await GetCompanyLogosAction();
+            if (result.success) {
+                setCompanyLogoList(result.data);
+            } else {
+                console.error('Failed to fetch company logo list:', result.error);
             }
-            const data = await response.json();
-            setCompanyLogoList(data.data);
         } catch (error) {
             console.error('Error fetching company logo list:', error);
         }
@@ -65,34 +66,26 @@ export default function CompanyLogo() {
 
         startDeleteTransition(async () => {
             try {
-                const response = await fetch(`/api/v2/admin/sd/company_logos/${cp_id}`, {
-                    method: 'DELETE',
-                });
+                const result = await DeleteCompanyLogoAction(cp_id);
 
-                if (!response.ok) {
-                    throw new Error('Failed to delete company logo');
+                if (!result.success) {
+                    throw new Error(result.error || 'Failed to delete company logo');
                 }
 
-                const result = await response.json();
-                console.log('Company logo deleted successfully:', result);
-
-                // Tampilkan atau perbarui toast jika berhasil
+                console.log('Company logo deleted successfully:', result.data);
                 toast.success("Company logo berhasil dihapus!", {
                     id: toastId,
                     description: "Company logo telah berhasil dihapus.",
                     duration: 3000,
                 });
 
-                // Fetch company logo list again to update the list
                 fetchCompanyLogoList();
-                setRefreshPreview(prev => !prev); // Trigger refresh for CompanyLogosPreview
+                setRefreshPreview(prev => !prev);
             } catch (error) {
                 console.error('Error deleting company logo:', error);
-
-                // Tampilkan atau perbarui toast jika gagal
                 toast.error("Gagal menghapus company logo", {
                     id: toastId,
-                    description: "Terjadi kesalahan saat menghapus company logo.",
+                    description: error.message || "Terjadi kesalahan saat menghapus company logo.",
                     duration: 3000,
                 });
             }
@@ -109,25 +102,16 @@ export default function CompanyLogo() {
 
         startTransition(async () => {
             try {
-                const formData = new FormData();
-                formData.append('logo', data.logo[0]);
-
                 setIsLoading(true);
                 setProgress(0);
 
-                const response = await fetch('/api/v2/admin/sd/company_logos', {
-                    method: 'POST',
-                    body: formData,
-                    duplex: 'half', // Add duplex option
-                });
+                const result = await InsertCompanyLogoAction(data.logo[0]);
 
-                if (!response.ok) {
-                    throw new Error('Failed to insert company logo');
+                if (!result.success) {
+                    throw new Error(result.error || 'Failed to insert company logo');
                 }
 
-                const result = await response.json();
-                console.log('Company logo inserted successfully:', result);
-
+                console.log('Company logo inserted successfully:', result.data);
                 toast.success("Data berhasil disimpan!", {
                     id: toastId,
                     description: "Company logo telah berhasil diperbarui.",
@@ -135,19 +119,16 @@ export default function CompanyLogo() {
                 });
 
                 form.reset();
-                if (fileInputRef.current) {
-                    fileInputRef.current.value = null; // Reset file input
-                }
-
+                if (fileInputRef.current) fileInputRef.current.value = null;
                 fetchCompanyLogoList();
-                setRefreshPreview(prev => !prev); // Trigger refresh for CompanyLogosPreview
+                setRefreshPreview(prev => !prev);
                 setPreview(null);
                 setIsLoading(false);
             } catch (error) {
                 console.error('Error submitting form:', error);
                 toast.error("Gagal menyimpan data", {
                     id: toastId,
-                    description: "Terjadi kesalahan saat menyimpan data.",
+                    description: error.message || "Terjadi kesalahan saat menyimpan data.",
                     duration: 3000,
                 });
                 setIsLoading(false);
@@ -192,10 +173,10 @@ export default function CompanyLogo() {
                                                     <div className="p-4 w-full">
                                                         <div className="grid grid-cols-1 gap-4 w-full">
                                                             {companyLogoList.map((logo) => (
-                                                                <div key={logo.cp_id} className="flex items-center justify-between p-2 border rounded-lg w-full">
+                                                                <div key={logo.id} className="flex items-center justify-between p-2 border rounded-lg w-full">
                                                                     <div className="flex items-center">
                                                                         <Image
-                                                                            src={`https://xmlmcdfzbwjljhaebzna.supabase.co/storage/v1/object/public/${logo.image_path}`}
+                                                                            src={logo.image_path}
                                                                             alt="Company Logo"
                                                                             width={100}
                                                                             height={100}
@@ -207,6 +188,7 @@ export default function CompanyLogo() {
                                                                             <AlertDialogTrigger asChild>
                                                                                 <Button
                                                                                     variant="outline"
+                                                                                    size="sm"
                                                                                     className="ml-4"
                                                                                     disabled={isDeleting}
                                                                                 >
@@ -222,7 +204,10 @@ export default function CompanyLogo() {
                                                                                 </AlertDialogHeader>
                                                                                 <AlertDialogFooter>
                                                                                     <AlertDialogCancel>Batal</AlertDialogCancel>
-                                                                                    <AlertDialogAction onClick={() => handleDelete(logo.cp_id)} disabled={isDeleting}>
+                                                                                    <AlertDialogAction onClick={(e) => {
+                                                                                        e.preventDefault();
+                                                                                        handleDelete(logo.id);
+                                                                                    }} disabled={isDeleting}>
                                                                                         {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Hapus'}
                                                                                     </AlertDialogAction>
                                                                                 </AlertDialogFooter>

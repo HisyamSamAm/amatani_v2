@@ -1,49 +1,46 @@
 'use server'
 
 import sql from "@/lib/postgres";
-import { supabase } from "@/lib/supabase/client";
+import { put, del } from "@vercel/blob";
 import { v4 as uuidv4 } from 'uuid';
+import { requireAdmin } from "@/lib/auth-check";
 
-export async function GetProductAction(req, { params }) {
-    const url = new URL(req.url);
-    const searchQuery = url.searchParams.get('search');
-    const sort = url.searchParams.get('sort');
-    const limit = parseInt(url.searchParams.get('limit')) || 10;
-    const offset = parseInt(url.searchParams.get('offset')) || 0;
+export async function GetProductAction({ searchQuery, sort, limit = 10, offset = 0 } = {}) {
+    await requireAdmin();
 
     const result = await sql.begin(async sql => {
         const products = await sql`
         SELECT 
-            p.product_id,
-            p.products_name,
-            p.products_description,
+            p.id,
+            p.name,
+            p.description,
             p.stock,
-            p.categories_id,
-            c.categories_name,
+            p.category_id,
+            c.name AS category_name,
             p.price_type,
             f.price,
             (
                 SELECT json_agg(json_build_object('min_quantity', w.min_quantity, 'max_quantity', w.max_quantity, 'price', w.price))
                 FROM wholesale_prices w
-                WHERE w.product_id = p.product_id
+                WHERE w.product_id = p.id
             ) AS wholesale_prices,
             (
                 SELECT json_agg(pi.image_path)
                 FROM product_images pi
-                WHERE pi.product_id = p.product_id
+                WHERE pi.product_id = p.id
             ) AS images,
             p.created_at
         FROM 
             products p
         LEFT JOIN 
-            fixed_prices f ON p.product_id = f.product_id AND p.price_type = 'fixed'
+            fixed_prices f ON p.id = f.product_id AND p.price_type = 'fixed'
         LEFT JOIN 
-            categories c ON p.categories_id = c.categories_id
-        ${searchQuery ? sql`WHERE p.products_name ILIKE ${'%' + searchQuery + '%'} 
-            OR p.products_description ILIKE ${'%' + searchQuery + '%'} 
-            OR c.categories_name ILIKE ${'%' + searchQuery + '%'}` : sql``}
-        ${sort === 'A-Z' ? sql`ORDER BY p.products_name ASC` : sql``}
-        ${sort === 'Z-A' ? sql`ORDER BY p.products_name DESC` : sql``}
+            categories c ON p.category_id = c.id
+        ${searchQuery ? sql`WHERE p.name ILIKE ${'%' + searchQuery + '%'} 
+            OR p.description ILIKE ${'%' + searchQuery + '%'} 
+            OR c.name ILIKE ${'%' + searchQuery + '%'}` : sql``}
+        ${sort === 'A-Z' ? sql`ORDER BY p.name ASC` : sql``}
+        ${sort === 'Z-A' ? sql`ORDER BY p.name DESC` : sql``}
         ${sort === 'Newest' ? sql`ORDER BY p.created_at DESC` : sql``}
         ${sort === 'Oldest' ? sql`ORDER BY p.created_at ASC` : sql``}
         LIMIT ${limit} OFFSET ${offset}
@@ -56,53 +53,52 @@ export async function GetProductAction(req, { params }) {
     return result;
 }
 
-export async function GetProductByIdAction(req, { params }) {
-    console.log(params);
-    const data = await params.product_id
+export async function GetProductByIdAction(product_id) {
+    await requireAdmin();
+    const data = product_id;
 
     // Query untuk mendapatkan data produk berdasarkan kategori yang sesuai dengan query
     const result = await sql`
             SELECT 
-                p.product_id,
-                p.products_name,
-                p.products_description,
+                p.id,
+                p.name,
+                p.description,
                 p.stock,
-                p.categories_id,
-                c.categories_name,
+                p.category_id,
+                c.name AS category_name,
                 p.created_at,
                 p.price_type,
                 f.price AS fixed_price,
                 (
                     SELECT json_agg(json_build_object('min_quantity', w.min_quantity, 'max_quantity', w.max_quantity, 'price', w.price))
                     FROM wholesale_prices w
-                    WHERE w.product_id = p.product_id
+                    WHERE w.product_id = p.id
                 ) AS wholesale_prices,
                 (
                     SELECT json_agg(pi.image_path)
                     FROM product_images pi
-                    WHERE pi.product_id = p.product_id
+                    WHERE pi.product_id = p.id
                 ) AS images
             FROM 
                 products p
             LEFT JOIN 
-                fixed_prices f ON p.product_id = f.product_id AND p.price_type = 'fixed'
+                fixed_prices f ON p.id = f.product_id AND p.price_type = 'fixed'
             LEFT JOIN 
-                categories c ON p.categories_id = c.categories_id
+                categories c ON p.category_id = c.id
             WHERE 
-                p.product_id = ${data};
+                p.id = ${data};
         `;
 
     return result;
 }
 
-export async function DeleteProductAction(req, { params }) {
-    const product_id = await params.product_id
-    console.log("🚀 ~ DeleteProductAction ~ product_id:", product_id)
+export async function DeleteProductAction(product_id) {
+    await requireAdmin();
     try {
         const result = await sql.begin(async sql => {
             // 1. Get product info first
             const [product] = await sql`
-                SELECT price_type FROM products WHERE product_id = ${product_id}
+                SELECT price_type FROM products WHERE id = ${product_id}
             `;
 
             if (!product) {
@@ -116,17 +112,14 @@ export async function DeleteProductAction(req, { params }) {
 
             // 3. Delete from storage if there are images
             if (product_images && product_images.length > 0) {
-                const imagePaths = product_images.map(img => img.image_path.split('/').pop());
+                const imagePaths = product_images.map(img => img.image_path);
                 console.log("Images to delete:", imagePaths);
 
                 if (imagePaths.length > 0) {
-                    const { error } = await supabase.storage
-                        .from('product_images')
-                        .remove(imagePaths);
-
-                    if (error && error.message !== 'Not found') {
-                        console.error('Error removing images:', error);
-                        throw new Error(`Failed to remove images: ${error.message}`);
+                    try {
+                        await del(imagePaths);
+                    } catch (error) {
+                        console.error('Error removing images from blob:', error);
                     }
                 }
             }
@@ -143,7 +136,7 @@ export async function DeleteProductAction(req, { params }) {
             // 5. Finally delete the product
             const [deletedProduct] = await sql`
                 DELETE FROM products 
-                WHERE product_id = ${product_id} 
+                WHERE id = ${product_id} 
                 RETURNING *
             `;
 
@@ -157,34 +150,34 @@ export async function DeleteProductAction(req, { params }) {
     }
 }
 
-export async function InsertProductAction(req, { params }) {
-    const formData = await req.formData();
-    const products_name = formData.get('products_name');
-    const products_description = formData.get('products_description');
+export async function InsertProductAction(formData) {
+    await requireAdmin();
+    const name = formData.get('name');
+    const description = formData.get('description');
     const stock = formData.get('stock');
     const fixed_price = formData.get('fixed_price');
     const price_type = formData.get('price_type');
     const category = JSON.parse(formData.get('category') || '{}');
-    const categories_id = category.categories_id;
-    const categories_name = category.categories_name;
+    const category_id = category.id || category.category_id;
+    const category_name = category.name;
     const product_images = formData.getAll('product_images');
     const wholesalePrices = JSON.parse(formData.get('wholesalePrices') || 'null');
 
     try {
         // Validasi data
-        if (!products_name) {
+        if (!name) {
             throw new Error("Nama produk harus diisi.");
         }
-        if (!products_description) {
+        if (!description) {
             throw new Error("Deskripsi produk harus diisi.");
         }
         if (!stock) {
             throw new Error("Stok harus diisi.");
         }
-        if (!categories_id) {
+        if (!category_id) {
             throw new Error("Kategori harus diisi.");
         }
-        if (!categories_name) {
+        if (!name) {
             throw new Error("Nama Kategori harus diisi")
         }
         if (!price_type) {
@@ -200,16 +193,16 @@ export async function InsertProductAction(req, { params }) {
             // Insert ke tabel products
             [product] = await sql`
                 INSERT INTO products (
-                    products_name, 
-                    products_description, 
+                    name, 
+                    description, 
                     stock, 
-                    categories_id,
+                    category_id,
                     price_type
                 ) VALUES (
-                    ${products_name}, 
-                    ${products_description}, 
+                    ${name}, 
+                    ${description}, 
                     ${stock}, 
-                    ${categories_id},
+                    ${category_id},
                     ${price_type}
                 )
                 RETURNING *;
@@ -222,7 +215,7 @@ export async function InsertProductAction(req, { params }) {
                         product_id, 
                         price
                     ) VALUES (
-                        ${product.product_id}, 
+                        ${product.id}, 
                         ${fixed_price}
                     );
                 `;
@@ -238,7 +231,7 @@ export async function InsertProductAction(req, { params }) {
                             max_quantity, 
                             price
                         ) VALUES (
-                            ${product.product_id}, 
+                            ${product.id}, 
                             ${wholesalePrice.min_quantity}, 
                             ${wholesalePrice.max_quantity}, 
                             ${wholesalePrice.price}
@@ -252,19 +245,19 @@ export async function InsertProductAction(req, { params }) {
                 for (const image of product_images) {
                     if (image && image.name) {
                         const fileName = `${uuidv4()}.${image.name.split('.').pop()}`;
-                        const { error } = await supabase.storage.from('product_images').upload(fileName, image);
+                        
+                        const blob = await put(`product_images/${fileName}`, image, {
+                            access: 'public',
+                        });
 
-                        if (error) {
-                            throw new Error(`Failed to upload image: ${error.message}`);
-                        }
-
-                        const imagePath = `product_images/${fileName}`;
+                        const imagePath = blob.url;
+                        
                         await sql`
                             INSERT INTO product_images (
                                 product_id, 
                                 image_path
                             ) VALUES (
-                                ${product.product_id}, 
+                                ${product.id}, 
                                 ${imagePath}
                             );
                         `;
@@ -284,12 +277,11 @@ export async function InsertProductAction(req, { params }) {
 
 
 
-export async function UpdateProductAction(req, { params }) {
-    const product_id = params.product_id;
+export async function UpdateProductAction(product_id, formData) {
+    await requireAdmin();
     try {
-        const formData = await req.formData();
-        const products_name = formData.get('products_name');
-        const products_description = formData.get('products_description');
+        const name = formData.get('name');
+        const description = formData.get('description');
         const stock = formData.get('stock');
         const price_type = formData.get('price_type');
         const fixed_price = formData.get('fixed_price');
@@ -298,10 +290,10 @@ export async function UpdateProductAction(req, { params }) {
         const product_images = formData.getAll('product_images');
 
         // Validasi data
-        if (!products_name) {
+        if (!name) {
             throw new Error("Nama produk harus diisi.");
         }
-        if (!products_description) {
+        if (!description) {
             throw new Error("Deskripsi produk harus diisi.");
         }
         if (!stock) {
@@ -310,7 +302,7 @@ export async function UpdateProductAction(req, { params }) {
         if (!price_type) {
             throw new Error("Tipe harga harus diisi.");
         }
-        if (!category || !category.categories_id) {
+        if (!category || !(category.id || category.category_id)) {
             throw new Error("Kategori harus diisi.");
         }
 
@@ -321,7 +313,7 @@ export async function UpdateProductAction(req, { params }) {
         const result = await sql.begin(async sql => {
             // Cek apakah produk ada
             const [existingProduct] = await sql`
-                SELECT product_id FROM products WHERE product_id = ${product_id}
+                SELECT id FROM products WHERE id = ${product_id}
             `;
 
             if (!existingProduct) {
@@ -332,12 +324,12 @@ export async function UpdateProductAction(req, { params }) {
             const [updatedProduct] = await sql`
                 UPDATE products 
                 SET 
-                    products_name = ${products_name},
-                    products_description = ${products_description},
+                    name = ${name},
+                    description = ${description},
                     stock = ${stock},
                     price_type = ${price_type},
-                    categories_id = ${category.categories_id}
-                WHERE product_id = ${product_id}
+                    category_id = ${category.id || category.category_id}
+                WHERE id = ${product_id}
                 RETURNING *
             `;
 
@@ -388,38 +380,43 @@ export async function UpdateProductAction(req, { params }) {
                 }
             }
             // Handle images
-            if (product_images && product_images.length > 0) {
-                // Get existing images
-                const existingImages = await sql`
-                    SELECT image_path FROM product_images WHERE product_id = ${product_id}
-                `;
+            const existing_images_from_form = formData.getAll('existing_images') || [];
+            
+            // Get current images from DB
+            const currentImages = await sql`
+                SELECT image_path FROM product_images WHERE product_id = ${product_id}
+            `;
 
-                // Delete existing images from storage
-                if (existingImages && existingImages.length > 0) {
-                    const imagePaths = existingImages.map(img => img.image_path.split('/').pop());
-                    if (imagePaths.length > 0) {
-                        const { error } = await supabase.storage
-                            .from('product_images')
-                            .remove(imagePaths);
+            // Find images to delete
+            const imagesToDelete = currentImages
+                .map(img => img.image_path)
+                .filter(path => !existing_images_from_form.includes(path));
 
-                        if (error && error.message !== 'Not found') {
-                            console.error('Error removing images:', error);
-                            throw new Error(`Failed to remove images: ${error.message}`);
-                        }
-                    }
-                    // Delete existing images from database
-                    await sql`DELETE FROM product_images WHERE product_id = ${product_id}`;
+            // Delete from storage and DB
+            if (imagesToDelete.length > 0) {
+                try {
+                    await del(imagesToDelete);
+                } catch (error) {
+                    console.error('Error removing images from blob:', error);
                 }
+                
+                for (const path of imagesToDelete) {
+                    await sql`DELETE FROM product_images WHERE product_id = ${product_id} AND image_path = ${path}`;
+                }
+            }
+
+            // Upload and insert new images
+            if (product_images && product_images.length > 0) {
                 for (const image of product_images) {
                     if (image && image.name) {
                         const fileName = `${uuidv4()}.${image.name.split('.').pop()}`;
-                        const { error } = await supabase.storage.from('product_images').upload(fileName, image);
+                        
+                        const blob = await put(`product_images/${fileName}`, image, {
+                            access: 'public',
+                        });
 
-                        if (error) {
-                            throw new Error(`Failed to upload image: ${error.message}`);
-                        }
-
-                        const imagePath = `product_images/${fileName}`;
+                        const imagePath = blob.url;
+                        
                         await sql`
                             INSERT INTO product_images (
                                 product_id, 
@@ -436,31 +433,31 @@ export async function UpdateProductAction(req, { params }) {
             // Ambil data produk yang sudah diupdate
             const [result] = await sql`
                 SELECT 
-                    p.product_id,
-                    p.products_name,
-                    p.products_description,
+                    p.id,
+                    p.name,
+                    p.description,
                     p.stock,
-                    p.categories_id,
-                    c.categories_name,
+                    p.category_id,
+                    c.name AS category_name,
                     p.price_type,
                     f.price,
                     (
                         SELECT json_agg(json_build_object('min_quantity', w.min_quantity, 'max_quantity', w.max_quantity, 'price', w.price))
                         FROM wholesale_prices w
-                        WHERE w.product_id = p.product_id
+                        WHERE w.product_id = p.id
                     ) AS wholesale_prices,
                     (
                         SELECT json_agg(pi.image_path)
                         FROM product_images pi
-                        WHERE pi.product_id = p.product_id
+                        WHERE pi.product_id = p.id
                     ) AS images
                 FROM 
                     products p
                 LEFT JOIN 
-                    fixed_prices f ON p.product_id = f.product_id AND p.price_type = 'fixed'
+                    fixed_prices f ON p.id = f.product_id AND p.price_type = 'fixed'
                 LEFT JOIN 
-                    categories c ON p.categories_id = c.categories_id
-                WHERE p.product_id = ${product_id};
+                    categories c ON p.category_id = c.id
+                WHERE p.id = ${product_id};
             `;
 
             return result;

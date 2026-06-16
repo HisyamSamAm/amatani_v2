@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { Skeleton } from "@/components/shadcnUi/skeleton";
+import { EmptyState } from "@/components/shadcnUi/empty-state";
+import { GetKategoriPanganActionPublic } from "@/app/actions/v2/public/landingPage";
 
 export default function HomeKPangan() {
     const [categories, setCategories] = useState([]);
@@ -12,12 +14,11 @@ export default function HomeKPangan() {
         const fetchCategories = async () => {
             try {
                 setIsLoading(true); // Mulai loading
-                const response = await fetch('/api/v2/public/lp/products/categories');
-                if (!response.ok) {
-                    throw new Error('Failed to fetch categories');
+                const response = await GetKategoriPanganActionPublic();
+                if (!response.success) {
+                    throw new Error(response.error || 'Failed to fetch categories');
                 }
-                const data = await response.json();
-                setCategories(data.data);
+                setCategories(response.data);
                 setError(null);
             } catch (error) {
                 console.error('Error fetching categories:', error);
@@ -61,6 +62,19 @@ export default function HomeKPangan() {
         return <div className="text-center py-8 text-red-500">Error: {error}</div>;
     }
 
+    if (!Array.isArray(categories) || categories.length === 0) {
+        return (
+            <section className="px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-8 bg-white">
+                <div className="container mx-auto">
+                    <EmptyState 
+                        title="Belum Ada Kategori Pangan"
+                        description="Toko kami masih dalam tahap persiapan. Nantikan hasil pangan terbaik kami segera!"
+                    />
+                </div>
+            </section>
+        );
+    }
+
     return (
         <section className="px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-8 bg-white">
             <div className="container mx-auto">
@@ -95,7 +109,7 @@ function ProductCard({ imageSrc, categoryName }) {
             {/* Gambar Background */}
             <div
                 className="w-full h-full bg-cover bg-no-repeat bg-center rounded-lg shadow-lg"
-                style={{ backgroundImage: `url(https://xmlmcdfzbwjljhaebzna.supabase.co/storage/v1/object/public/${imageSrc})` }}
+                style={{ backgroundImage: `url(${imageSrc})` }}
             ></div>
             {/* Label Nama Kategori */}
             <div className="absolute bottom-2 left-2 flex justify-start items-center px-2 py-1 rounded-full bg-white bg-opacity-90">

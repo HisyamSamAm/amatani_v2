@@ -14,6 +14,8 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Skeleton } from "@/components/shadcnUi/skeleton";
+import { GetProductDetailActionCustomers } from "@/app/actions/v2/public/product/productActions";
+import { AddToCartCustomers } from "@/app/actions/v2/customer/cartActions";
 
 const formSchema = z.object({
     quantity: z.number().min(1, "Quantity must be at least 1"),
@@ -40,10 +42,9 @@ export default function ProductDetailComponent({ product_id }) {
     useEffect(() => {
         async function fetchProducts(product_id) {
             try {
-                const result = await fetch(`/api/v2/public/products/${product_id}`);
-                if (result.ok) {
-                    const data = await result.json();
-                    setProductsData(data.data);
+                const result = await GetProductDetailActionCustomers({ product_id });
+                if (result && result.length > 0) {
+                    setProductsData(result[0]);
                 }
             } catch (error) {
                 console.error("Error fetching products:", error);
@@ -134,34 +135,29 @@ export default function ProductDetailComponent({ product_id }) {
     // Mapping gambar untuk Carousel, jika ada
     const images = productsData?.images
         ? productsData.images.map((img) => ({
-            src: `https://xmlmcdfzbwjljhaebzna.supabase.co/storage/v1/object/public/${img}`,
-            alt: productsData.products_name,
+            src: img,
+            alt: productsData.name,
         }))
         : [];
 
     const onSubmit = (data) => {
         startTransition(async () => {
             try {
-                const formData = new FormData()
-                formData.append('product_id', productsData.product_id)
-                formData.append('quantity', data.quantity)
-
-                const response = await fetch('/api/v2/customer/cart', {
-                    method: 'POST',
-                    credentials: 'include',
-                    body: formData
-                })
-
-                if (response.status === 401) {
+                if (!userId) {
                     router.push('/login')
                     return
                 }
 
-                const result = await response.json()
+                const result = await AddToCartCustomers({ 
+                    product_id: productsData.id, 
+                    quantity: data.quantity,
+                    user_id: userId 
+                })
+
                 console.log("🚀 ~ startTransition ~ result:", result)
 
-                if (!response.ok) {
-                    throw new Error(result.message || 'Failed to add to cart')
+                if (!result.success) {
+                    throw new Error(result.error || 'Failed to add to cart')
                 }
 
                 console.log('Added to cart successfully')
@@ -216,7 +212,7 @@ export default function ProductDetailComponent({ product_id }) {
                 </div>
                 {/* Product Details Section */}
                 <div className="order-2 lg:order-2 lg:col-span-3 lg:sticky lg:top-4">
-                    <h1 className="text-3xl font-bold mb-4">{productsData.products_name}</h1>
+                    <h1 className="text-3xl font-bold mb-4">{productsData.name}</h1>
                     <div className="space-y-6 w-full">
                         <Separator />
                         <div className="flex justify-around text-center">

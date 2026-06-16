@@ -28,7 +28,9 @@ import {
     PopoverTrigger,
 } from "@/components/shadcnUi/popover"
 import { Check, ChevronsUpDown } from "lucide-react"
-import { AspectRatio } from "@/components/shadcnUi/aspect-ratio"
+import { AspectRatio } from "@/components/shadcnUi/aspect-ratio";
+import { GetFoodCategoriesAction, InsertFoodCategoriesAction, DeleteFoodCategoriesAction } from "@/app/actions/v2/dashboard/admin/sd/foodCategories";
+import { GetCategoriesAction } from "@/app/actions/v2/dashboard/admin/products/categoriesActions";
 
 const formSchema = z.object({
     category_id: z.string().min(1, { message: "Tidak boleh kosong" }),
@@ -66,12 +68,12 @@ export default function KategoriPangan() {
     // Fungsi untuk mengambil data food category dari API
     const fetchFoodCategoryList = async () => {
         try {
-            const response = await fetch('/api/v2/admin/sd/food_categories');
-            if (!response.ok) {
-                throw new Error('Failed to fetch food category list');
+            const result = await GetFoodCategoriesAction();
+            if (result.success) {
+                setFoodCategoryList(result.data);
+            } else {
+                console.error('Failed to fetch food category list:', result.error);
             }
-            const data = await response.json();
-            setFoodCategoryList(data.data);
         } catch (error) {
             console.error('Error fetching food category list:', error);
         }
@@ -80,8 +82,7 @@ export default function KategoriPangan() {
     // Fungsi untuk mengambil data kategori dari API
     const fetchCategories = async () => {
         try {
-            const response = await fetch('/api/v2/admin/products/categories');
-            const result = await response.json();
+            const result = await GetCategoriesAction();
             if (result.success && Array.isArray(result.data)) {
                 setCategories(result.data);
             } else {
@@ -99,34 +100,26 @@ export default function KategoriPangan() {
 
         startDeleteTransition(async () => {
             try {
-                const response = await fetch(`/api/v2/admin/sd/food_categories/${food_categories_id}`, {
-                    method: 'DELETE',
-                });
+                const result = await DeleteFoodCategoriesAction(food_categories_id);
 
-                if (!response.ok) {
-                    throw new Error('Failed to delete food category');
+                if (!result.success) {
+                    throw new Error(result.error || 'Failed to delete food category');
                 }
 
-                const result = await response.json();
-                console.log('Food category deleted successfully:', result);
-
-                // Tampilkan atau perbarui toast jika berhasil
+                console.log('Food category deleted successfully:', result.data);
                 toast.success("Food category berhasil dihapus!", {
                     id: toastId,
                     description: "Food category telah berhasil dihapus.",
                     duration: 3000,
                 });
 
-                // Fetch food category list again to update the list
                 fetchFoodCategoryList();
-                setRefreshPreview(prev => !prev); // Trigger refresh for FoodCategoryPreview
+                setRefreshPreview(prev => !prev);
             } catch (error) {
                 console.error('Error deleting food category:', error);
-
-                // Tampilkan atau perbarui toast jika gagal
                 toast.error("Gagal menghapus food category", {
                     id: toastId,
-                    description: "Terjadi kesalahan saat menghapus food category.",
+                    description: error.message || "Terjadi kesalahan saat menghapus food category.",
                     duration: 3000,
                 });
             }
@@ -145,45 +138,31 @@ export default function KategoriPangan() {
 
         startTransition(async () => {
             try {
-                const formData = new FormData();
-                formData.append('categories_id', data.category_id);
-                formData.append('category_image', data.categoryImage[0]);
-
                 setIsLoading(true);
                 setProgress(0);
 
-                const response = await fetch('/api/v2/admin/sd/food_categories', {
-                    method: 'POST',
-                    body: formData,
-                    duplex: 'half', // Add duplex option
-                });
+                const result = await InsertFoodCategoriesAction(data.category_id, data.categoryImage[0]);
 
-                if (!response.ok) {
-                    throw new Error('Failed to insert food category');
+                if (!result.success) {
+                    throw new Error(result.error || 'Failed to insert food category');
                 }
 
-                const result = await response.json();
-                console.log('Food category inserted successfully:', result);
-
+                console.log('Food category inserted successfully:', result.data);
                 toast.success("Data berhasil disimpan!", {
-
                     description: "Food category telah berhasil diperbarui.",
                     duration: 3000,
                 });
 
                 form.reset();
-                if (fileInputRef.current) {
-                    fileInputRef.current.value = null; // Reset file input
-                }
-
+                if (fileInputRef.current) fileInputRef.current.value = null;
                 fetchFoodCategoryList();
-                setRefreshPreview(prev => !prev); // Trigger refresh for FoodCategoryPreview
+                setRefreshPreview(prev => !prev);
                 setPreview(null);
                 setIsLoading(false);
             } catch (error) {
                 console.error('Error submitting form:', error);
                 toast.error("Gagal menyimpan data", {
-                    description: "Terjadi kesalahan saat menyimpan data.",
+                    description: error.message || "Terjadi kesalahan saat menyimpan data.",
                     duration: 3000,
                 });
                 setIsLoading(false);
@@ -231,7 +210,7 @@ export default function KategoriPangan() {
                                                                 <div key={category.food_categories_id} className="flex items-center justify-between p-2 border rounded-lg w-full">
                                                                     <div className="flex items-center">
                                                                         <Image
-                                                                            src={`https://xmlmcdfzbwjljhaebzna.supabase.co/storage/v1/object/public/${category.image_path}`}
+                                                                            src={category.image_path}
                                                                             alt="Food Category Image"
                                                                             width={100}
                                                                             height={100}

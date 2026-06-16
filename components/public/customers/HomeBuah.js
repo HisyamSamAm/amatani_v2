@@ -8,6 +8,8 @@ import { AlertCircle } from "lucide-react"; // Ikon untuk fallback
 import Image from "next/image";
 import Link from "next/link";
 import { Skeleton } from "@/components/shadcnUi/skeleton";
+import { EmptyState } from "@/components/shadcnUi/empty-state";
+import { GetAllProductPublic } from "@/app/actions/v2/public/landingPage";
 
 export default function HomeBuah() {
     const [categories, setCategories] = useState([]);
@@ -19,13 +21,13 @@ export default function HomeBuah() {
         async function fetchProducts(retryCount = 0) {
             try {
                 setIsLoading(true);
-                const result = await fetch('/api/v2/public/lp/products');
-                if (!result.ok) {
-                    throw new Error(`HTTP error! status: ${result.status}`);
+                const result = await GetAllProductPublic();
+                if (!result.success) {
+                    throw new Error(result.error || 'Failed to fetch products');
                 }
-                const data = await result.json();
+                const data = result;
                 console.log("Data Kategori:", data);
-                console.log("Jumlah Kategori:", data.length);
+                console.log("Jumlah Kategori:", data.data?.length);
                 setCategories(data.data);
                 setError(null);
             } catch (error) {
@@ -98,16 +100,29 @@ export default function HomeBuah() {
         );
     }
 
+    if (!Array.isArray(categories) || categories.length === 0) {
+        return (
+            <section className="py-8 px-4 md:px-16">
+                <div className="max-w-full container mx-auto">
+                    <EmptyState 
+                        title="Belum Ada Produk"
+                        description="Toko kami masih bersiap-siap untuk panen. Mohon kembali lagi nanti untuk melihat produk segar kami."
+                    />
+                </div>
+            </section>
+        );
+    }
+
     return (
         <section className="py-8 px-4 md:px-16">
             <div className="max-w-full container mx-auto ">
                 {/* Scrollable Area */}
                 <div className="flex flex-col gap-y-8">
                     {Array.isArray(categories) && categories.map((category, index) => (
-                        <div key={category.categories_id} className={index > 0 ? "gap-y-4" : "gap-y-0"}>
+                        <div key={category.id} className={index > 0 ? "gap-y-4" : "gap-y-0"}>
                             {/* Tambahkan judul kategori */}
                             <h2 className="text-xl md:text-2xl font-semibold mb-4 md:mb-6 text-gray-800">
-                                {category.categories_name}
+                                {category.name}
                             </h2>
 
                             {category.products && category.products.length > 0 && (
@@ -118,8 +133,8 @@ export default function HomeBuah() {
                                                 key={product.product_id}
                                                 product_id={product.product_id}
                                                 imageSrc={product.images?.[0] || "/placeholder-image.png"}
-                                                name={product.products_name || "Nama tidak tersedia"}
-                                                category={category.categories_name}
+                                                name={product.name || "Nama tidak tersedia"}
+                                                category={category.name}
                                                 priceType={product.price_type}
                                                 fixedPrice={product.fixed_price}
                                                 wholesalePrices={product.wholesale_prices || []}
@@ -162,7 +177,7 @@ function ProductCard({ product_id, imageSrc, name, category, priceType, fixedPri
                 <CardHeader className="p-0">
                     <AspectRatio ratio={1}>
                         <Image
-                            src={`https://xmlmcdfzbwjljhaebzna.supabase.co/storage/v1/object/public/${imageSrc}`}
+                            src={imageSrc}
                             alt={name}
                             className="object-cover w-full h-full"
                             width={200}

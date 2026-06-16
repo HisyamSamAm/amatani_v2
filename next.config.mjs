@@ -1,5 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+    experimental: {
+        serverActions: {
+            bodySizeLimit: '10mb',
+        },
+    },
     images: {
         remotePatterns: [
             {
@@ -12,6 +17,13 @@ const nextConfig = {
             {
                 protocol: 'https',
                 hostname: 'lh3.googleusercontent.com',
+                port: '',
+                pathname: '/**',
+                search: '',
+            },
+            {
+                protocol: 'https',
+                hostname: 'xk0bh0bdqlsy1y0m.public.blob.vercel-storage.com',
                 port: '',
                 pathname: '/**',
                 search: '',

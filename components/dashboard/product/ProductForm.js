@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState, useTransition } from 'react';
+import { GetCategoriesAction } from '@/app/actions/v2/dashboard/admin/products/categoriesActions';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -130,8 +131,7 @@ export default function ProductForm({ mode, product, onSubmit }) {
     useEffect(() => {
         async function GetData() {
             try {
-                const response = await fetch(`/api/v2/admin/products/categories`);
-                const result = await response.json();
+                const result = await GetCategoriesAction();
                 if (result.success && Array.isArray(result.data)) {
                     setCategories(result.data);
                 } else {
@@ -151,19 +151,19 @@ export default function ProductForm({ mode, product, onSubmit }) {
         if (mode === 'edit' && product && categories.length > 0) {
             // Check if the category exists in the categories data
             const categoryExists = categories.some(
-                (category) => category.categories_id === product.categories_id
+                (category) => category.id === product.category_id
             );
 
             // If the category exists, set the form values
             if (categoryExists) {
-                form.setValue("product_id", product.product_id);
-                form.setValue("products_name", product.products_name);
+                form.setValue("product_id", product.id);
+                form.setValue("products_name", product.name);
                 form.setValue("category", {
-                    categories_id: product.categories_id,
-                    categories_name: product.categories_name,
+                    categories_id: product.category_id.toString(),
+                    categories_name: product.category_name,
                 });
                 form.setValue("stock", product.stock);
-                form.setValue("products_description", product.products_description);
+                form.setValue("products_description", product.description);
                 form.setValue("price_type", product.price_type);
                 form.setValue("fixed_price", product.price_type === 'fixed' ? Number(product.fixed_price) : 0);
                 form.setValue(
@@ -173,8 +173,8 @@ export default function ProductForm({ mode, product, onSubmit }) {
                 form.setValue("product_images", product.images);
             } else {
                 // If the category does not exist, display a warning and set a default category
-                console.warn(`Category with ID ${product.categories_id} not found in categories data.`);
-                toast.error(`Kategori dengan ID ${product.categories_id} tidak ditemukan. Silakan pilih kategori lain.`);
+                console.warn(`Category with ID ${product.category_id} not found in categories data.`);
+                toast.error(`Kategori dengan ID ${product.category_id} tidak ditemukan. Silakan pilih kategori lain.`);
                 form.setValue("category", { categories_id: "", categories_name: "Tidak ada kategori" });
             }
         }
@@ -220,7 +220,7 @@ export default function ProductForm({ mode, product, onSubmit }) {
                 const toastId = toast.loading("Sedang memperbarui produk...");
 
                 if (mode === 'edit') {
-                    data.product_id = product.product_id;
+                    data.product_id = product.id;
                 }
                 const result = await onSubmit(data);
                 // Menampilkan toast sukses jika operasi berhasil
@@ -289,18 +289,18 @@ export default function ProductForm({ mode, product, onSubmit }) {
                                             <FormControl>
                                                 <Select
                                                     onValueChange={(value) => {
-                                                        const selectedCategory = categories.find(category => category.categories_id === value);
-                                                        field.onChange(selectedCategory ? { categories_id: selectedCategory.categories_id, categories_name: selectedCategory.categories_name } : { categories_id: "", categories_name: "" });
+                                                        const selectedCategory = categories.find(category => category.id.toString() === value);
+                                                          field.onChange(selectedCategory ? { categories_id: selectedCategory.id.toString(), categories_name: selectedCategory.name } : { categories_id: "", categories_name: "" });
                                                     }}
-                                                    value={field.value.categories_id}
+                                                    value={field.value.categories_id || undefined}
                                                 >
                                                     <SelectTrigger>
                                                         <SelectValue placeholder="Pilih Kategori" />
                                                     </SelectTrigger>
                                                     <SelectContent>
                                                         {categories.map(category => (
-                                                            <SelectItem key={category.categories_id} value={category.categories_id}>
-                                                                {category.categories_name}
+                                                            <SelectItem key={category.id} value={category.id.toString()}>
+                                                                {category.name}
                                                             </SelectItem>
                                                         ))}
                                                     </SelectContent>

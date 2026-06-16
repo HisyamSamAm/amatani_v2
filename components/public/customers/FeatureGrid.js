@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Skeleton } from "@/components/shadcnUi/skeleton";
+import { GetServiceActionPublic } from "@/app/actions/v2/public/landingPage";
 
 export default function FeatureGrid() {
     const [features, setFeatures] = useState([]);
@@ -12,12 +13,11 @@ export default function FeatureGrid() {
         const fetchFeatures = async () => {
             try {
                 setIsLoading(true); // Mulai loading
-                const response = await fetch('/api/v2/public/lp/service');
-                if (!response.ok) {
-                    throw new Error('Failed to fetch features');
+                const response = await GetServiceActionPublic();
+                if (!response.success) {
+                    throw new Error(response.error || 'Failed to fetch features');
                 }
-                const data = await response.json();
-                setFeatures(data.data);
+                setFeatures(response.data);
                 setError(null);
             } catch (error) {
                 console.error('Error fetching features:', error);
@@ -74,13 +74,13 @@ export default function FeatureGrid() {
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                     {features.map((feature) => (
-                        <div key={feature.service_id} className="relative group flex flex-col items-center overflow-hidden">
+                        <div key={feature.id} className="relative group flex flex-col items-center overflow-hidden">
                             <div
                                 className="w-full h-[250px] sm:h-[350px] md:h-[450px] bg-cover bg-center transform group-hover:scale-105 transition duration-300"
-                                style={{ backgroundImage: `url(https://xmlmcdfzbwjljhaebzna.supabase.co/storage/v1/object/public/${feature.image_path})` }}
+                                style={{ backgroundImage: `url(${feature.image_path})` }}
                             ></div>
                             <div className="absolute bottom-2 sm:bottom-4 left-1/2 transform -translate-x-1/2 bg-white text-gray-800 text-sm sm:text-base font-semibold py-1 px-2 sm:py-1 sm:px-4 rounded-full shadow-md">
-                                {feature.service_name}
+                                {feature.name}
                             </div>
                         </div>
                     ))}

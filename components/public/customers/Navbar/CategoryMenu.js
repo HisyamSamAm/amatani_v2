@@ -6,6 +6,7 @@ import { AlignJustify } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/shadcnUi/button";
 import { useEffect, useState } from "react";
+import { GetCategoriesActionPublic } from "@/app/actions/v2/public/landingPage";
 
 
 export default function CategoryMenu({ isRootPath }) {
@@ -14,14 +15,13 @@ export default function CategoryMenu({ isRootPath }) {
     useEffect(() => {
         async function GetCategories() {
             try {
-                const result = await fetch('/api/v2/public/lp/categories');
-                const data = await result.json();
+                const data = await GetCategoriesActionPublic();
                 console.log("🚀 ~ GetCategories ~ data:", data);
 
                 if (data && data.success && Array.isArray(data.data)) {
                     SetCategories(data.data); // Mengakses data.data
                 } else {
-                    console.error("Invalid data format from API");
+                    console.error("Invalid data format from Action");
                     SetCategories([]);
                 }
             } catch (error) {
@@ -44,14 +44,14 @@ export default function CategoryMenu({ isRootPath }) {
             <HoverCardContent className="p-3 w-56 bg-white rounded-md shadow-md translate-x-7">
                 {Categories.length > 0 ? (
                     Categories.map((category) => {
-                        const formattedCategoryName = category.categories_name.toLowerCase();
+                        const formattedCategoryName = category.name.toLowerCase();
                         return (
                             <Button
-                                key={category.categories_id}
+                                key={category.id}
                                 className="w-full text-left mt-2 text-gray-950 bg-white hover:bg-rose-100 hover:outline hover:outline-2 hover:outline-rose-600"
                                 asChild
                             >
-                                <Link href={`/products?category=${formattedCategoryName}`}>{category.categories_name}</Link>
+                                <Link href={`/products?category=${formattedCategoryName}`}>{category.name}</Link>
                             </Button>
                         );
                     })

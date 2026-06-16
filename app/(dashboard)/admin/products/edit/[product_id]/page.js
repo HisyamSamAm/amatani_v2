@@ -10,12 +10,13 @@ import ProductForm from "@/components/dashboard/product/ProductForm";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { Toaster } from "@/components/shadcnUi/toaster";
+import { GetProductByIdAction, UpdateProductAction } from "@/app/actions/v2/dashboard/admin/products/productsActions";
 
 export default function EditProductPage({ params }) {
     const router = useRouter();
     const { product_id } = React.use(params);
     const [product, setProduct] = useState(null);
-    console.log("🚀 ~ EditProductPage semua ~ product:", product)
+
 
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -23,15 +24,11 @@ export default function EditProductPage({ params }) {
         const fetchProduct = async () => {
             try {
                 setIsLoading(true);
-                const response = await fetch(`/api/v2/admin/products/${product_id}`);
-                if (!response.ok) {
-                    throw new Error('Gagal mengambil data produk');
-                }
-                const data = await response.json();
-                console.log('Fetched product data:', data.data); // Log data produk
-                // Pastikan data.data adalah array dan memiliki elemen sebelum menetapkan ke state
-                if (Array.isArray(data.data) && data.data.length > 0) {
-                    setProduct(data.data[0]); // Mengakses objek produk pertama dari array
+                const data = await GetProductByIdAction(product_id);
+                console.log('Fetched product data:', data); // Log data produk
+                // Pastikan data adalah array dan memiliki elemen sebelum menetapkan ke state
+                if (Array.isArray(data) && data.length > 0) {
+                    setProduct(data[0]); // Mengakses objek produk pertama dari array
                 } else {
                     setError("Produk tidak ditemukan"); // Set error jika produk tidak ditemukan
                     toast.error("Produk tidak ditemukan");
@@ -56,12 +53,15 @@ export default function EditProductPage({ params }) {
 
         try {
             const formData = new FormData();
-            formData.append('products_name', params.products_name);
-            formData.append('products_description', params.products_description);
+            formData.append('name', params.products_name);
+            formData.append('description', params.products_description);
             formData.append('stock', params.stock);
             formData.append('fixed_price', params.fixed_price);
             formData.append('price_type', params.price_type);
-            formData.append('category', JSON.stringify(params.category));
+            formData.append('category', JSON.stringify({
+                category_id: params.category.categories_id,
+                name: params.category.categories_name
+            }));
             formData.append('wholesalePrices', JSON.stringify(params.wholesalePrices));
 
             // Handle existing and new images
@@ -75,22 +75,17 @@ export default function EditProductPage({ params }) {
 
             console.log('FormData created:', Object.fromEntries(formData)); // Log FormData
 
-            const result = await fetch(`/api/v2/admin/products/${params.product_id}`, {
-                method: 'PUT',
-                body: formData
-            });
-
-            const data = await result.json();
+            const data = await UpdateProductAction(params.product_id, formData);
             console.log('API response:', data); // Log response
 
-            if (result.ok) {
+            if (data && !data.error) {
                 // Menampilkan toast sukses dengan sonner
                 // toast.success("Produk berhasil diperbarui", { id: toastId });
                 // router.push('/dashboard/products');
                 return { success: true, data };
             }
 
-            throw new Error(data.message || 'Gagal memperbarui produk');
+            throw new Error(data?.error || 'Gagal memperbarui produk');
         } catch (error) {
             console.error('Error in handleEditProduct:', error);
             // toast.error(error.message || "Gagal memperbarui produk", { id: toastId });

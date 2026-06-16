@@ -28,10 +28,8 @@ export function UserTable({ users, onDelete, onEdit }) {
         { key: 'avatar', label: 'Avatar', isVisible: true },
         { key: 'name', label: 'Name', isVisible: true },
         { key: 'email', label: 'Email', isVisible: true },
-        { key: 'phone', label: 'Phone', isVisible: true },
-        { key: 'verification', label: 'Verification', isVisible: true },
-        { key: 'created_at', label: 'Created At', isVisible: true },
-        { key: 'last_sign_in_at', label: 'Last Sign In', isVisible: true }
+        { key: 'role', label: 'Role', isVisible: true },
+        { key: 'verification', label: 'Verifikasi Email', isVisible: true },
     ]);
 
     const [isPending, startTransition] = useTransition();
@@ -51,14 +49,8 @@ export function UserTable({ users, onDelete, onEdit }) {
         let sortableUsers = [...users];
         if (sortConfig.key) {
             sortableUsers.sort((a, b) => {
-                let aValue = a[sortConfig.key];
-                let bValue = b[sortConfig.key];
-
-                if (sortConfig.key === 'name') {
-                    aValue = a.user_metadata.name;
-                    bValue = b.user_metadata.name;
-                }
-
+                const aValue = a[sortConfig.key] ?? '';
+                const bValue = b[sortConfig.key] ?? '';
                 if (aValue < bValue) return sortConfig.direction === 'ascending' ? -1 : 1;
                 if (aValue > bValue) return sortConfig.direction === 'ascending' ? 1 : -1;
                 return 0;
@@ -118,7 +110,7 @@ export function UserTable({ users, onDelete, onEdit }) {
                                     )}
                                 </TableHead>
                             ))}
-                            {/* <TableHead>Actions</TableHead> */}
+                            <TableHead>Actions</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -127,43 +119,39 @@ export function UserTable({ users, onDelete, onEdit }) {
                                 {columns.find(col => col.key === 'avatar')?.isVisible && (
                                     <TableCell>
                                         <Avatar>
-                                            <AvatarImage src={user.user_metadata.avatar_url} alt={user.user_metadata.name} />
+                                            <AvatarImage src={user.image} alt={user.name} />
                                             <AvatarFallback>
-                                                {user.user_metadata.name ? user.user_metadata.name.split(' ').map(n => n[0]).join('').toUpperCase() : 'NA'}
+                                                {user.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'NA'}
                                             </AvatarFallback>
                                         </Avatar>
                                     </TableCell>
                                 )}
                                 {columns.find(col => col.key === 'name')?.isVisible && (
-                                    <TableCell>{user.user_metadata.name || 'N/A'}</TableCell>
+                                    <TableCell>{user.name || 'N/A'}</TableCell>
                                 )}
                                 {columns.find(col => col.key === 'email')?.isVisible && (
                                     <TableCell>{user.email}</TableCell>
                                 )}
-                                {columns.find(col => col.key === 'phone')?.isVisible && (
-                                    <TableCell>{user.phone || 'N/A'}</TableCell>
+                                {columns.find(col => col.key === 'role')?.isVisible && (
+                                    <TableCell>
+                                        <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
+                                            {user.role || 'customer'}
+                                        </Badge>
+                                    </TableCell>
                                 )}
                                 {columns.find(col => col.key === 'verification')?.isVisible && (
                                     <TableCell>
-                                        <div className="flex flex-col gap-1">
-                                            <Badge variant={user.user_metadata.email_verified ? "success" : ""} className={user.user_metadata.email_verified ? "" : "bg-rose-100 text-rose-600 hover:bg-rose-200 hover:text-rose-600"}>
-                                                {user.user_metadata.email_verified ? <Check className="h-3 w-3 mr-1" /> : <X className="h-3 w-3 mr-1" />}
-                                                Email
-                                            </Badge>
-                                            <Badge variant={user.user_metadata.phone_verified ? "success" : ""} className={user.user_metadata.phone_verified ? "" : "bg-rose-100 text-rose-600 hover:bg-rose-200 hover:text-rose-600"}>
-                                                {user.user_metadata.phone_verified ? <Check className="h-3 w-3 mr-1" /> : <X className="h-3 w-3 mr-1" />}
-                                                Phone
-                                            </Badge>
-                                        </div>
+                                        <Badge
+                                            variant={user.emailVerified ? 'default' : 'secondary'}
+                                            className={user.emailVerified ? 'bg-green-100 text-green-700' : 'bg-rose-100 text-rose-600'}
+                                        >
+                                            {user.emailVerified ? <Check className="h-3 w-3 mr-1 inline" /> : <X className="h-3 w-3 mr-1 inline" />}
+                                            Email
+                                        </Badge>
                                     </TableCell>
                                 )}
-                                {columns.find(col => col.key === 'created_at')?.isVisible && (
-                                    <TableCell>{formatDate(user.created_at)}</TableCell>
-                                )}
-                                {columns.find(col => col.key === 'last_sign_in_at')?.isVisible && (
-                                    <TableCell>{user.last_sign_in_at ? formatDate(user.last_sign_in_at) : 'Never'}</TableCell>
-                                )}
-                                {/* <TableCell>
+
+                                <TableCell>
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
                                             <Button variant="outline" className="h-8 w-8 p-0">
@@ -174,17 +162,16 @@ export function UserTable({ users, onDelete, onEdit }) {
                                         <DropdownMenuContent align="end">
                                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
                                             <DropdownMenuItem onClick={() => onEdit(user.id)}>Edit</DropdownMenuItem>
-                                            <DropdownMenuItem onClick={() => console.log('View details', user.id)}>View Details</DropdownMenuItem>
-                                            {user.banned_until ? (
-                                                <DropdownMenuItem onClick={() => console.log('Unban user', user.id)}>Unban User</DropdownMenuItem>
-                                            ) : (
-                                                <DropdownMenuItem onClick={() => console.log('Ban user', user.id)}>Ban User</DropdownMenuItem>
-                                            )}
                                             <DropdownMenuSeparator />
-                                            <DropdownMenuItem onClick={() => openDialog(user.id)}>Delete</DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                className="text-red-600"
+                                                onClick={() => openDialog(user.id)}
+                                            >
+                                                Hapus
+                                            </DropdownMenuItem>
                                         </DropdownMenuContent>
                                     </DropdownMenu>
-                                </TableCell> */}
+                                </TableCell>
                             </TableRow>
                         ))}
                     </TableBody>

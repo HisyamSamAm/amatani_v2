@@ -9,7 +9,6 @@ import { Alert, AlertDescription } from "@/components/shadcnUi/alert"
 import { Progress } from '@/components/shadcnUi/progress'
 import Image from 'next/image'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/shadcnUi/alert-dialog'
-import { supabase } from "@/lib/supabase/client";
 const MAX_FILE_SIZE = 4 * 1024 * 1024; // 4MB
 const ALLOWED_FILE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_FILES = 6;
@@ -101,25 +100,9 @@ export function ProductImageUpload({ onChange, value, error, mode }) {
 
   const removeFile = useCallback(async (fileToRemove) => {
     if (typeof fileToRemove === 'string') {
-      // Extract the file name from the URL
-      const fileName = fileToRemove.split('/').pop();
-      const { error: storageError } = await supabase.storage.from('product_images').remove([fileName]);
-      if (storageError) {
-        setLocalError(`Failed to remove image from storage: ${storageError.message}`);
-        return;
-      }
-
-      const { error: dbError } = await supabase
-        .from('product_images')
-        .delete()
-        .eq('image_path', fileName);
-
-      if (dbError) {
-        setLocalError(`Failed to remove image path from database: ${dbError.message}`);
-        return;
-      }
-
-      console.log('Image removed successfully from storage and database');
+      // Hanya menghapus dari state lokal.
+      // Penghapusan asli dari Vercel Blob dan DB akan di-handle oleh Server Action saat form di-submit.
+      console.log('Image marked for removal');
     } else {
       URL.revokeObjectURL(fileToRemove.preview);
     }
@@ -185,7 +168,7 @@ export function ProductImageUpload({ onChange, value, error, mode }) {
                   width={150}
                   height={150}
                   src={typeof file === 'string'
-                    ? `https://xmlmcdfzbwjljhaebzna.supabase.co/storage/v1/object/public/${file}`
+                    ? file
                     : file.preview}
                   alt={`Preview ${index + 1}`}
                   className="rounded-md object-cover w-full h-full border"

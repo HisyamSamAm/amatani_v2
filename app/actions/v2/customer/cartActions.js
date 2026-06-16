@@ -1,21 +1,24 @@
 "use server";
 
 import sql from "@/lib/postgres";
+import { auth } from "@/auth";
 
 /**
  * @description Menghitung total produk unik di dalam keranjang berdasarkan user_id.
  * @param {Object} { user_id } - Objek yang berisi user_id.
  * @returns {Promise<{success: boolean, data?: number, error?: any}>} Objek yang berisi status keberhasilan, jumlah produk unik jika berhasil, atau pesan error jika gagal.
  */
-export async function GetCountCartCustomers(req, { params }) {
-    const user_id = await params.user_id;
+export async function GetCountCartCustomers({ user_id }) {
     try {
+        const session = await auth();
+        if (!session?.user?.id) return { success: false, error: "Unauthorized" };
+        user_id = session.user.id;
         // Query untuk menghitung total produk unik di dalam keranjang berdasarkan user_id
         const result = await sql`
             SELECT
-                COUNT(DISTINCT ci.product_id) AS total_products
+                COUNT(DISTINCT ci.id) AS total_products
             FROM carts c
-            LEFT JOIN carts_items ci ON ci.cart_id = c.carts_id
+            LEFT JOIN carts_items ci ON ci.cart_id = c.id
             WHERE c.user_id = ${user_id}
             LIMIT 1;
         `;
@@ -50,63 +53,66 @@ export async function GetCountCartCustomers(req, { params }) {
  * @returns {Promise<{success: boolean, data?: any, error?: any}>} Objek yang berisi status keberhasilan, data keranjang jika berhasil, atau pesan error jika gagal.
  */
 export async function GetCartActionCustomers({ user_id }) {
-    console.log("🚀 ~ GetCartActionCustomers ~ query:", user_id)
     try {
+        const session = await auth();
+        if (!session?.user?.id) return { success: false, error: "Unauthorized" };
+        user_id = session.user.id;
+
         const result = await sql`
             SELECT
-                c.carts_id,
+                c.id,
                 c.user_id,
                 c.created_at,
                 COALESCE(
                     JSON_AGG(
                         JSON_BUILD_OBJECT(
-                            'cart_items_id', ci.cart_items_id,
+                            'id', ci.id,
                             'product_id', ci.product_id,
                             'quantity', ci.quantity,
                             'item_created_at', ci.created_at,
-                            'products_name', p.products_name,
+                            'name', p.name,
                             'stock', p.stock,
                             'price_type', p.price_type,
                             'fixed_price',
                                 (
                                     SELECT fp.price
                                     FROM fixed_prices fp
-                                    WHERE fp.product_id = p.product_id
+                                    WHERE fp.product_id = p.id
                                     LIMIT 1
                                 ),
                             'wholesale_prices',
                                 (
                                     SELECT JSON_AGG(
                                         JSON_BUILD_OBJECT(
-                                            'wholesale_prices_id', wp.wholesale_prices_id,
+                                            'id', wp.id,
                                             'min_quantity', wp.min_quantity,
                                             'max_quantity', wp.max_quantity,
                                             'price', wp.price
                                         )
                                     )
                                     FROM wholesale_prices wp
-                                    WHERE wp.product_id = p.product_id
+                                    WHERE wp.product_id = p.id
                                 ),
                             'product_images',
                                 (
                                     SELECT JSON_AGG(
                                         JSON_BUILD_OBJECT(
-                                            'images_id', pi.images_id,
+                                            'id', pi.id,
                                             'image_path', pi.image_path
                                         )
                                     )
                                     FROM product_images pi
-                                    WHERE pi.product_id = p.product_id
+                                    WHERE pi.product_id = p.id
                                 )
                         )
-                    ) FILTER (WHERE ci.cart_items_id IS NOT NULL),
+                    ) FILTER (WHERE ci.id IS NOT NULL),
                     '[]'
                 ) AS items
             FROM carts c
-            LEFT JOIN carts_items ci ON ci.cart_id = c.carts_id
-            LEFT JOIN products p ON p.product_id = ci.product_id
+            LEFT JOIN carts_items ci ON ci.cart_id = c.id
+            LEFT JOIN products p ON p.id = ci.product_id
             WHERE c.user_id = ${user_id}
-            GROUP BY c.carts_id, c.user_id, c.created_at
+            GROUP BY c.id, c.user_id, c.created_at
             LIMIT 1;
         `;
 
@@ -122,16 +128,19 @@ export async function GetCartActionCustomers({ user_id }) {
 }
 
 /**
- * @description Menghapus item dari keranjang berdasarkan cart_items_id dan user_id.
- * @param {Object} { cart_items_id, user_id } - Objek yang berisi cart_items_id dan user_id.
+ * @description Menghapus item dari keranjang berdasarkan id dan user_id.
+ * @param {Object} { id, user_id } - Objek yang berisi id dan user_id.
  * @returns {Promise<{success: boolean, message?: string, error?: any}>} Objek yang berisi status keberhasilan, pesan jika berhasil, atau pesan error jika gagal.
  */
-export async function DeleteCartItemCustomer({ cart_items_id, user_id }) {
+export async function DeleteCartItemCustomer({ id, user_id }) {
     try {
+        const session = await auth();
+        if (!session?.user?.id) return { success: false, error: "Unauthorized" };
+        user_id = session.user.id;
         const result = await sql`
             DELETE FROM carts_items
-            WHERE cart_items_id = ${cart_items_id}
-            AND cart_id IN (SELECT carts_id FROM carts WHERE user_id = ${user_id})
+            WHERE id = ${id}
+            AND cart_id IN (SELECT id FROM carts WHERE user_id = ${user_id})
             RETURNING *;
         `;
 
@@ -147,17 +156,20 @@ export async function DeleteCartItemCustomer({ cart_items_id, user_id }) {
 }
 
 /**
- * @description Mengubah kuantitas item di dalam keranjang berdasarkan cart_items_id, quantity, dan user_id.
- * @param {Object} { cart_items_id, quantity, user_id } - Objek yang berisi cart_items_id, quantity, dan user_id.
+ * @description Mengubah kuantitas item di dalam keranjang berdasarkan id, quantity, dan user_id.
+ * @param {Object} { id, quantity, user_id } - Objek yang berisi id, quantity, dan user_id.
  * @returns {Promise<{success: boolean, message?: string, data?: any, error?: any}>} Objek yang berisi status keberhasilan, pesan jika berhasil, data item yang diubah jika berhasil, atau pesan error jika gagal.
  */
-export async function QuantityChangeCartCustomer({ cart_items_id, quantity, user_id }) {
+export async function QuantityChangeCartCustomer({ id, quantity, user_id }) {
     try {
+        const session = await auth();
+        if (!session?.user?.id) return { success: false, error: "Unauthorized" };
+        user_id = session.user.id;
         const result = await sql`
             UPDATE carts_items
             SET quantity = ${quantity}
-            WHERE cart_items_id = ${cart_items_id}
-            AND cart_id IN (SELECT carts_id FROM carts WHERE user_id = ${user_id})
+            WHERE id = ${id}
+            AND cart_id IN (SELECT id FROM carts WHERE user_id = ${user_id})
             RETURNING *;
         `;
 
@@ -172,17 +184,17 @@ export async function QuantityChangeCartCustomer({ cart_items_id, quantity, user
     }
 }
 
-export async function AddToCartCustomers({ request, user }) {
+export async function AddToCartCustomers({ product_id, quantity, user_id }) {
     try {
-        const formData = await request.formData()
-        const product_id = formData.get('product_id')
-        const quantity = parseInt(formData.get('quantity'))
+        const session = await auth();
+        if (!session?.user?.id) return { success: false, error: "Unauthorized" };
+        user_id = session.user.id;
 
         // Check if cart exists for user
         let cart = await sql`
-            SELECT carts_id 
+            SELECT id 
             FROM carts 
-            WHERE user_id = ${user.id}
+            WHERE user_id = ${user_id}
             LIMIT 1;
         `;
 
@@ -190,8 +202,8 @@ export async function AddToCartCustomers({ request, user }) {
         if (cart.length === 0) {
             cart = await sql`
                 INSERT INTO carts (user_id)
-                VALUES (${user.id})
-                RETURNING carts_id;
+                VALUES (${user_id})
+                RETURNING id;
             `;
         }
 
@@ -199,7 +211,7 @@ export async function AddToCartCustomers({ request, user }) {
         let cartItem = await sql`
             SELECT * 
             FROM carts_items 
-            WHERE cart_id = ${cart[0].carts_id} 
+            WHERE cart_id = ${cart[0].id} 
             AND product_id = ${product_id}
             LIMIT 1;
         `;
@@ -209,7 +221,7 @@ export async function AddToCartCustomers({ request, user }) {
             cartItem = await sql`
                 UPDATE carts_items
                 SET quantity = quantity + ${quantity}
-                WHERE cart_id = ${cart[0].carts_id}
+                WHERE cart_id = ${cart[0].id}
                 AND product_id = ${product_id}
                 RETURNING *;
             `;
@@ -222,7 +234,7 @@ export async function AddToCartCustomers({ request, user }) {
                     quantity
                 )
                 VALUES (
-                    ${cart[0].carts_id},
+                    ${cart[0].id},
                     ${product_id},
                     ${quantity}
                 )
@@ -230,22 +242,17 @@ export async function AddToCartCustomers({ request, user }) {
             `;
         }
 
-        console.log("🚀 ~ AddToCartCustomers ~ Success:", {
-            user_id: user.id,
-            cart_id: cart[0].carts_id,
-            product_id,
-            quantity
-        });
+
 
         return {
             success: true,
             data: {
-                user_id: user.id,
+                user_id,
                 ...cartItem[0]
             }
         };
     } catch (error) {
-        console.error("🚀 ~ AddToCartCustomers ~ Error:", error);
+
         return { success: false, error: error.message };
     }
 }

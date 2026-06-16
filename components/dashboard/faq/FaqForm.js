@@ -11,7 +11,8 @@ import { Select, SelectItem, SelectTrigger, SelectContent, SelectValue } from "@
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/shadcnUi/form";
 import { Loader2 } from 'lucide-react';
 import { Toaster, toast } from "sonner";
-import { useRouter } from 'next/navigation'
+import { useRouter } from 'next/navigation';
+import { GetCategoriesFaqAction } from "@/app/actions/v2/dashboard/admin/faq/categoriesActions";
 
 const formSchema = z.object({
     title: z.string().min(1, { message: "Tidak boleh kosong" }),
@@ -25,7 +26,7 @@ const formSchema = z.object({
 export default function FAQForm({ mode, faq, onSubmit }) {
     const [categories, setCategories] = useState([]);
     const [isPending, startTransition] = useTransition();
-    const router = useRouter()
+    const router = useRouter();
     const form = useForm({
         resolver: zodResolver(formSchema),
         defaultValues: {
@@ -38,13 +39,12 @@ export default function FAQForm({ mode, faq, onSubmit }) {
     useEffect(() => {
         async function fetchCategories() {
             try {
-                const response = await fetch('/api/v2/admin/faq/categories');
-                const result = await response.json();
-                if (result.success && Array.isArray(result.data)) {
-                    setCategories(result.data);
-                    console.log("Fetched categories:", result.data);
+                const data = await GetCategoriesFaqAction();
+                if (Array.isArray(data)) {
+                    setCategories(data);
+                    console.log("Fetched categories:", data);
                 } else {
-                    console.error("Categories data is not an array:", result);
+                    console.error("Categories data is not an array:", data);
                     setCategories([]);
                 }
 
@@ -52,8 +52,8 @@ export default function FAQForm({ mode, faq, onSubmit }) {
                     form.setValue("title", faq.title);
                     form.setValue("content", faq.content);
                     form.setValue("category", {
-                        category_id: faq.category_id.toString(),
-                        category_name: faq.category_name,
+                        category_id: faq.category_id ? faq.category_id.toString() : "",
+                        category_name: faq.name || "",
                     });
                 }
             } catch (error) {
@@ -66,14 +66,14 @@ export default function FAQForm({ mode, faq, onSubmit }) {
 
     useEffect(() => {
         if (mode === 'edit' && faq && categories.length > 0) {
-            const categoryExists = categories.some(category => category.category_id.toString() === faq.category_id.toString());
+            const categoryExists = categories.some(category => category.id.toString() === faq.category_id?.toString());
             console.log("Category exists:", categoryExists);
             if (categoryExists) {
                 form.setValue("title", faq.title);
                 form.setValue("content", faq.content);
                 form.setValue("category", {
-                    category_id: faq.category_id.toString(),
-                    category_name: faq.category_name,
+                    category_id: faq.category_id ? faq.category_id.toString() : "",
+                    category_name: faq.name || "",
                 });
             } else {
                 console.error("Category not found in categories data.");
@@ -168,19 +168,19 @@ export default function FAQForm({ mode, faq, onSubmit }) {
                                         <FormControl>
                                             <Select
                                                 onValueChange={(value) => {
-                                                    const selectedCategory = categories.find(category => category.category_id === value);
+                                                    const selectedCategory = categories.find(category => category.id.toString() === value);
                                                     console.log("Selected category:", selectedCategory);
-                                                    field.onChange(selectedCategory ? { category_id: selectedCategory.category_id, category_name: selectedCategory.category_name } : { category_id: "", category_name: "" });
+                                                    field.onChange(selectedCategory ? { category_id: selectedCategory.id.toString(), category_name: selectedCategory.name } : { category_id: "", category_name: "" });
                                                 }}
-                                                value={field.value.category_id}
+                                                value={field.value.category_id || undefined}
                                             >
                                                 <SelectTrigger>
                                                     <SelectValue placeholder="Pilih Kategori" />
                                                 </SelectTrigger>
                                                 <SelectContent>
                                                     {categories.map(category => (
-                                                        <SelectItem key={category.category_id} value={category.category_id.toString()}>
-                                                            {category.category_name}
+                                                        <SelectItem key={category.id} value={category.id.toString()}>
+                                                            {category.name}
                                                         </SelectItem>
                                                     ))}
                                                 </SelectContent>

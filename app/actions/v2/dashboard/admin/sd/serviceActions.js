@@ -1,8 +1,12 @@
+'use server';
+
 import sql from "@/lib/postgres";
-import { supabase } from "@/lib/supabase/client";
+import { put, del } from "@vercel/blob";
 import { v4 as uuidv4 } from 'uuid';
+import { requireAdmin } from '@/lib/auth-check';
 
 export async function GetServiceAction() {
+    await requireAdmin();
     try {
         const services = await sql`SELECT * FROM lp_service`;
         return { success: true, data: services };
@@ -13,6 +17,7 @@ export async function GetServiceAction() {
 }
 
 export async function InsertServiceAction(serviceName, image) {
+    await requireAdmin();
     try {
         if (!serviceName || !image) {
             throw new Error("Service name and image are required");
@@ -24,23 +29,16 @@ export async function InsertServiceAction(serviceName, image) {
         // Convert the file to a ReadableStream
         const stream = image.stream();
 
-        // Upload the file to Supabase storage
-        const { data, error } = await supabase.storage
-            .from('lp')
-            .upload(fileName, stream, {
-                contentType: image.type,
-                duplex: 'half',
-            });
+        // Upload the file to Vercel Blob
+        const blob = await put(`lp/${fileName}`, image, {
+            access: 'public',
+        });
 
-        if (error) {
-            throw new Error(`Failed to upload image: ${error.message}`);
-        }
-
-        const imagePath = `lp/${fileName}`;
+        const imagePath = blob.url;
 
         // Insert the image path and service name into the database
         const [result] = await sql`
-            INSERT INTO lp_service (service_name, image_path)
+            INSERT INTO lp_service (name, image_path)
             VALUES (${serviceName}, ${imagePath})
             RETURNING *;
         `;
@@ -52,38 +50,30 @@ export async function InsertServiceAction(serviceName, image) {
     }
 }
 
-export async function DeleteServiceAction(service_id) {
+export async function DeleteServiceAction(id) {
+    await requireAdmin();
     try {
-        if (!service_id) {
+        if (!id) {
             throw new Error("Service ID is required");
         }
 
         // Get the image path from the database
         const [service] = await sql`
             SELECT image_path FROM lp_service
-            WHERE service_id = ${service_id};
+            WHERE id = ${id};
         `;
 
         if (!service) {
             throw new Error('Service not found');
         }
 
-        // Extract the file name from the image path
-        const fileName = service.image_path.split('/').pop();
-
-        // Delete the image from Supabase storage
-        const { error } = await supabase.storage
-            .from('lp')
-            .remove([fileName]);
-
-        if (error) {
-            throw new Error(`Failed to delete image: ${error.message}`);
-        }
+        // Delete the image from Vercel Blob
+        await del(service.image_path);
 
         // Delete the service from the database
         const result = await sql`
             DELETE FROM lp_service
-            WHERE service_id = ${service_id}
+            WHERE id = ${id}
             RETURNING *;
         `;
 

@@ -1,0 +1,79 @@
+# Analisis Mendalam Proyek: Amatani
+
+Berdasarkan penelusuran terhadap struktur repositori `Amatani`, konfigurasi *package.json*, struktur *folder* Next.js, serta *Server Actions*, berikut adalah hasil analisis komprehensif dari sistem **Amatani**.
+
+---
+
+## 1. Arsitektur & Teknologi (*Tech Stack*)
+
+Proyek **Amatani** dibangun sebagai aplikasi web monolitik *full-stack* menggunakan ekosistem Next.js terbaru dengan pendekatan *Server-Side Rendering* (SSR) dan *Server Actions*.
+
+### **Frontend & UI Framework**
+*   **Framework Utama:** **Next.js 15** dengan **React 18** menggunakan arsitektur **App Router** (`app/` directory).
+*   **Styling:** **Tailwind CSS** dipadukan dengan **Shadcn UI** (berbasis **Radix UI**). Ini memberikan komponen UI *headless* yang sangat responsif, mudah dikustomisasi, dan memiliki aksesibilitas (a11y) yang baik.
+*   **Form & Validasi:** Menggunakan kombinasi **React Hook Form** dan **Zod** untuk penanganan *state* formulir dan validasi data secara *type-safe*.
+*   **Data Visualization & Carousel:** Terintegrasi dengan **Recharts** untuk dasbor analitik/laporan (kemungkinan pada modul dasbor admin) dan **Embla Carousel React** untuk *slider* UI di *landing page*.
+*   **Komponen Lainnya:** Menggunakan `lucide-react` untuk ikon, `sonner` untuk notifikasi (*toast*), dan `date-fns` untuk manipulasi tanggal.
+
+### **Backend & Database**
+*   **Database & Auth Provider:** **Supabase**.
+    *   **Autentikasi:** Menggunakan `@supabase/ssr` dan `@supabase/supabase-js` untuk manajemen *session*, *login*, dan *callback* Oauth/Magic Link (terlihat pada rute `app/(auth)/auth/callback/route.js`).
+    *   **Storage:** Menggunakan Supabase Storage untuk mengelola *file* aset gambar (seperti logo perusahaan, layanan, dan gambar produk).
+*   **Database Driver (Raw SQL):** Alih-alih sepenuhnya bergantung pada Supabase Client (PostgREST) untuk manipulasi data, Amatani menggunakan paket **`postgres`** (`import postgres from 'postgres'`). Aplikasi ini mengeksekusi kueri **Raw SQL** secara langsung menggunakan *Template Literals* (`sql\``) di dalam Next.js *Server Actions* (di dalam `app/actions/v2/`). Pendekatan ini memberikan kontrol mutlak atas optimasi kueri SQL kompleks (seperti JOIN untuk produk dan harga grosir).
+
+---
+
+## 2. Struktur Arsitektur (Routing & Modul)
+
+Aplikasi dipartisi dengan sangat rapi ke dalam *Route Groups* (`(...)`), yang memisahkan tata letak (*layout*) dan hak akses pengguna secara logis tanpa memengaruhi URL utama.
+
+1.  **`(auth)`**: Mengurus rute autentikasi dan integrasi sesi pengguna dengan Supabase (seperti *callback handler*).
+2.  **`(dashboard)/admin`**: Ranah administrasi platform (*Admin Panel*). Terdapat direktori untuk berbagai fitur manajemen internal.
+3.  **`(public)`**: Area yang dapat diakses oleh umum (Guest) yang juga membawahi modul **`(customer)`**. Area ini mencakup *Landing Page* dan manajemen pembelian.
+4.  **`actions/v2`**: Pusat logika bisnis (Controller/Service layer). Semua operasi *database* diisolasi di folder ini menggunakan fitur Next.js *Server Actions*, terbagi dalam kategori: `admin`, `customer`, dan `public`.
+
+---
+
+## 3. Fitur Utama & Fungsionalitas
+
+Dari struktur *Server Actions* dan halaman yang ada, berikut adalah pemetaan fitur inti dalam aplikasi Amatani:
+
+1.  **Katalog & Manajemen Produk (`products`)**
+    *   Produk memiliki dukungan sistem harga bertingkat: **Harga Tetap (*Fixed Prices*)** dan **Harga Grosir (*Wholesale Prices*)**.
+    *   Sistem relasi *1-to-many* untuk gambar produk (`product_images`) dan kategori produk (`categories`).
+2.  **Sistem Pemesanan & Keranjang (`cart` & `orders`)**
+    *   Fitur *e-commerce* standar di mana *customer* dapat menambahkan barang ke keranjang (`cart`) dan melakukan *checkout* menjadi pesanan (`orders`).
+3.  **Dekorasi Toko / Landing Page Dinamis (`shop_decoration` & `lp_*` tables)**
+    *   Admin memiliki fitur **Shop Decoration** untuk mengatur konten *Landing Page* secara dinamis tanpa *hardcode*.
+    *   Ini mencakup pengaturan: *Company Logos* (`lp_company_logos`), *Food Categories* (`lp_food_categories`), *Services* (`lp_service`), dan *Experiences* (`lp_experience`).
+4.  **Sistem Dompet & Transaksi (`wallet` & `transaction`)**
+    *   Adanya modul dompet digital/saldo (*wallet*) dan pencatatan transaksi yang terintegrasi, yang memudahkan proses *refund*, *top-up*, atau pembayaran dalam ekosistem Amatani.
+5.  **Pusat Bantuan & Ulasan (`faq` & `reviews`)**
+    *   Manajemen tanya jawab (FAQ) dengan kategori terstruktur (`faq_category`).
+    *   Sistem ulasan pelanggan terhadap produk (`reviews`).
+6.  **Pelaporan & Analitik (`report`)**
+    *   Fitur generasi laporan bagi admin untuk melihat statistik penjualan, aktivitas pelanggan, dan lain-lain (kemungkinan dirender dengan *Recharts*).
+
+---
+
+## 4. Analisis Hak Akses (*Roles*)
+
+Secara implisit, aplikasi ini memiliki dua *role* utama yang direpresentasikan melalui *routing*:
+
+*   **Admin:** Pengguna dengan hak akses tertinggi yang masuk ke dalam `(dashboard)/admin`. Mereka memiliki kontrol penuh untuk memanipulasi *database* (CRUD Produk, mengubah *layout Landing Page* via *Shop Decoration*, melihat statistik dompet/transaksi, mengelola ulasan, dan data pelanggan).
+*   **Customer / Guest:**
+    *   **Guest:** Dapat mengakses `(public)` seperti *Home*, Tentang Kami, FAQ, dan melihat katalog Produk.
+    *   **Customer (Authenticated):** Setelah *login*, mereka mendapat akses ke area `(public)/(customer)` yang mengizinkan mereka memanipulasi keranjang belanja (`cart`), melacak pesanan (`orders`), dan mengelola profil atau dompet mereka.
+
+---
+
+## 5. Kesimpulan & Potensi Optimalisasi
+
+### **Kelebihan Pendekatan Saat Ini:**
+1.  **Performa & SEO:** Next.js App Router dan *Server Actions* mengurangi ukuran *bundle JavaScript* di sisi klien, membuat aplikasi sangat cepat dan *SEO-friendly* (krusial untuk situs *e-commerce*).
+2.  **Kontrol Kueri Ekstra:** Penggunaan Raw SQL `postgres.js` memberi fleksibilitas tinggi. Kueri `JOIN` yang kompleks antar harga grosir, harga tetap, dan gambar dapat dieksekusi dengan efisien dalam satu *round-trip*.
+
+### **Saran / Area Optimalisasi:**
+1.  **Raw SQL Security:** Eksekusi Raw SQL menggunakan *Template Literals* (`sql\`` dari paket `postgres`) pada dasarnya sudah melindungi dari *SQL Injection* karena berfungsi sebagai *parameterized queries*. Namun, perlu dipastikan tidak ada penyisipan variabel langsung ke dalam *string query* tanpa melalui *tag literal* `${}`.
+2.  **Penerapan Middleware:** Pastikan `middleware.js` melindungi rute `app/(dashboard)/admin` secara ketat. Pengecekan sesi Supabase harus divalidasi pada level *Middleware* agar *user* biasa tidak bisa melakukan *Bypass* *routing* ke halaman admin.
+3.  **Supabase RLS (Row Level Security):** Karena aplikasi menggunakan koneksi langsung Postgres (*bypass* Supabase PostgREST Client), fitur RLS Supabase *tidak* akan otomatis berlaku pada kueri dari paket `postgres.js`. Autorisasi (pengecekan *user_id* / *role*) **wajib** divalidasi secara manual di dalam setiap *Server Action*. Pastikan setiap mutasi data (INSERT/UPDATE/DELETE) memverifikasi izin *user* sebelum mengeksekusi SQL.

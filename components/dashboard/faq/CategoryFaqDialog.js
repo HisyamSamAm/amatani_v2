@@ -11,7 +11,8 @@ import { Loader2, Plus, Trash } from 'lucide-react';
 import { useEffect, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { ScrollArea } from "@/components/shadcnUi/scroll-area"; // Import ScrollArea
+import { ScrollArea } from "@/components/shadcnUi/scroll-area";
+import { GetCategoriesFaqAction, InsertCategoriesFaqAction, DeleteCategoriesFaqAction } from "@/app/actions/v2/dashboard/admin/faq/categoriesActions";
 
 const formSchema = z.object({
     name: z.string().min(1, { message: 'Jangan lupa di isi' })
@@ -32,12 +33,11 @@ export default function ManageCategoryFaqDialog() {
 
     const fetchCategories = async () => {
         try {
-            const response = await fetch('/api/v2/admin/faq/categories');
-            const result = await response.json();
-            if (result.success && Array.isArray(result.data)) {
-                setCategories(result.data);
+            const data = await GetCategoriesFaqAction();
+            if (Array.isArray(data)) {
+                setCategories(data);
             } else {
-                console.error("Categories data is not an array:", result);
+                console.error("Categories data is not an array:", data);
                 setCategories([]);
             }
         } catch (error) {
@@ -48,30 +48,23 @@ export default function ManageCategoryFaqDialog() {
     const onSubmit = (params) => {
         startAdding(async () => {
             try {
-                const formData = new FormData();
-                formData.append('name', params.name);
+                const result = await InsertCategoriesFaqAction(params.name);
 
-                const result = await fetch('/api/v2/admin/faq/categories', {
-                    method: 'POST',
-                    body: formData,
-                });
-
-                if (!result.ok) {
-                    throw new Error('Failed to add category');
+                if (result && !result.error) {
+                    fetchCategories();
+                    form.reset();
+                    toast("Category added successfully", {
+                        duration: 3000,
+                        description: `The category "${params.name}" has been added.`,
+                    });
+                } else {
+                    throw new Error(result?.error || 'Failed to add category');
                 }
-
-                await result.json();
-                fetchCategories();
-                form.reset();
-                toast("Category added successfully", {
-                    duration: 3000,
-                    description: `The category "${params.name}" has been added.`,
-                });
             } catch (error) {
                 console.error('Error adding category:', error);
                 toast("Failed to add category", {
                     duration: 3000,
-                    description: "An error occurred while adding the category.",
+                    description: error.message || "An error occurred while adding the category.",
                 });
             }
         });
@@ -81,25 +74,22 @@ export default function ManageCategoryFaqDialog() {
         setPendingCategoryId(categoryId);
         startDeleting(async () => {
             try {
-                const response = await fetch(`/api/v2/admin/faq/categories/${categoryId}`, {
-                    method: 'DELETE',
-                });
+                const result = await DeleteCategoriesFaqAction(categoryId);
 
-                if (!response.ok) {
-                    throw new Error('Failed to delete category');
+                if (result && !result.error) {
+                    fetchCategories();
+                    toast("Category deleted successfully", {
+                        duration: 3000,
+                        description: `The category "${categoryName}" has been deleted.`,
+                    });
+                } else {
+                    throw new Error(result?.error || 'Failed to delete category');
                 }
-
-                await response.json();
-                fetchCategories();
-                toast("Category deleted successfully", {
-                    duration: 3000,
-                    description: `The category "${categoryName}" has been deleted.`,
-                });
             } catch (error) {
                 console.error('Failed to delete category:', error);
                 toast("Failed to delete category", {
                     duration: 3000,
-                    description: "An error occurred while deleting the category.",
+                    description: error.message || "An error occurred while deleting the category.",
                 });
             } finally {
                 setPendingCategoryId(null);
@@ -163,18 +153,18 @@ export default function ManageCategoryFaqDialog() {
                         <div className="space-y-2"> {/* Tambahkan class ini */}
                             {Array.isArray(categories) && categories.map((category) => (
                                 <div
-                                    key={category.category_id}
+                                    key={category.id}
                                     className="flex items-center justify-between p-2 border rounded-md"
                                 >
-                                    <p className="text-sm">{category.category_name}</p>
+                                    <p className="text-sm">{category.name}</p>
                                     <AlertDialog>
                                         <AlertDialogTrigger asChild>
                                             <Button
                                                 variant="outline"
                                                 className="w-8 h-8 flex items-center justify-center"
-                                                disabled={isDeleting && pendingCategoryId === category.category_id}
+                                                disabled={isDeleting && pendingCategoryId === category.id}
                                             >
-                                                {isDeleting && pendingCategoryId === category.category_id ? (
+                                                {isDeleting && pendingCategoryId === category.id ? (
                                                     <Loader2 className="w-4 h-4 text-red-500 animate-spin" />
                                                 ) : (
                                                     <Trash className="w-4 h-4 text-red-500" />
@@ -191,7 +181,10 @@ export default function ManageCategoryFaqDialog() {
                                             <AlertDialogFooter>
                                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                                                 <AlertDialogAction
-                                                    onClick={() => handleDeleteCategory(category.category_id, category.category_name)}
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        handleDeleteCategory(category.id, category.name);
+                                                    }}
                                                 >
                                                     Delete
                                                 </AlertDialogAction>

@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/shadcnUi/card";
 import { AspectRatio } from "@/components/shadcnUi/aspect-ratio";
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import { GetCompanyLogosAction } from "@/app/actions/v2/dashboard/admin/sd/companyLogosActions";
 
 export default function CompanyLogosPreview({ refresh }) {
     const [logos, setLogos] = useState([]);
@@ -12,12 +13,12 @@ export default function CompanyLogosPreview({ refresh }) {
 
     const fetchCompanyLogos = async () => {
         try {
-            const response = await fetch('/api/v2/admin/sd/company_logos');
-            if (!response.ok) {
-                throw new Error('Failed to fetch company logos');
+            const result = await GetCompanyLogosAction();
+            if (result.success) {
+                setLogos(result.data);
+            } else {
+                console.error('Failed to fetch company logos:', result.error);
             }
-            const data = await response.json();
-            setLogos(data.data);
         } catch (error) {
             console.error('Error fetching company logos:', error);
         }
@@ -63,12 +64,12 @@ export default function CompanyLogosPreview({ refresh }) {
                 >
                     <CarouselContent className="-ml-2 md:-ml-4">
                         {logos.map((logo) => (
-                            <CarouselItem key={logo.cp_id} className="pl-2 md:pl-4 basis-1/3">
+                            <CarouselItem key={logo.id} className="pl-2 md:pl-4 basis-1/3">
                                 <Card className="border-none shadow-none">
                                     <CardContent className="p-2">
                                         <AspectRatio ratio={1 / 1} className="bg-white">
                                             <Image
-                                                src={`https://xmlmcdfzbwjljhaebzna.supabase.co/storage/v1/object/public/${logo.image_path}`}
+                                                src={logo.image_path}
                                                 alt="Company Logo"
                                                 width={200}
                                                 height={200}

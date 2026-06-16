@@ -1,39 +1,42 @@
 'use server';
 
 import sql from "@/lib/postgres";
+import { requireAdmin } from "@/lib/auth-check";
 
-// http://localhost:3000/api/dashboard/faq/categories
-export async function GetCategoriesFaqAction(req, { params }) {
+// Fetch all FAQ categories
+export async function GetCategoriesFaqAction() {
+    await requireAdmin();
     try {
-        const categories = await sql`SELECT category_id, category_name, created_at FROM faq_category;`;
+        const categories = await sql`SELECT id, name, created_at FROM faq_category;`;
         return categories;
     } catch (error) {
         console.error("Error fetching categories:", error);
-        return { error: "Failed to fetch categories", error };
+        return { error: "Failed to fetch categories" };
     }
 }
 
-export async function DeleteCategoriesFaqAction(req, { params }) {
+// Delete an FAQ category by ID
+export async function DeleteCategoriesFaqAction(category_id) {
+    await requireAdmin();
     try {
-        const category_id = params.category_id;
-        console.log("🚀 ~ DeleteCategoriesFaqAction ~ category_id:", category_id);
-        const result = await sql`DELETE FROM faq_category WHERE category_id = ${category_id} RETURNING *`;
+
+        const result = await sql`DELETE FROM faq_category WHERE id = ${category_id} RETURNING *`;
         return result;
     } catch (error) {
         console.error("Error deleting category:", error);
-        return { error: "Failed to delete category", error };
+        return { error: "Failed to delete category" };
     }
 }
 
-export async function InsertCategoriesFaqAction(req, { params }) {
+// Insert a new FAQ category by name
+export async function InsertCategoriesFaqAction(name) {
+    await requireAdmin();
     try {
-        const formData = await req.formData();
-        const category_name = formData.get('name'); // Pastikan nama field sesuai dengan yang dikirim dari form
-        console.log('Inserting category:', category_name);
-        const result = await sql`INSERT INTO faq_category (category_name) VALUES (${category_name}) RETURNING *`;
+        console.log('Inserting category:', name);
+        const result = await sql`INSERT INTO faq_category (name) VALUES (${name}) RETURNING *`;
         return result;
     } catch (error) {
         console.error("Error inserting category:", error);
-        return { error: "Failed to insert category", error };
+        return { error: "Failed to insert category" };
     }
 }

@@ -30,15 +30,15 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Avatar, AvatarFallback, AvatarImage } from "../shadcnUi/avatar"
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "../shadcnUi/button"
-import { Logout } from "@/api v1/actions v1/v1/Auth"
+import { signOut } from "next-auth/react"
 
 export function AppSidebar({ user }) {
   const pathname = usePathname();
   const router = useRouter()
 
-  const userName = user?.user_metadata?.name || "Loading...";
-  const userEmail = user?.user_metadata?.email || "Loading...";
-  const userAvatar = user?.user_metadata?.avatar_url || "/FE/img02.png";
+  const userName = user?.name || "Loading...";
+  const userEmail = user?.email || "Loading...";
+  const userAvatar = user?.image || "/FE/img02.png";
 
   return (
     <Sidebar collapsible="icon">
@@ -256,7 +256,7 @@ export function AppSidebar({ user }) {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem>
                   {/* logout */}
-                  <Button variant='link' onClick={() => { Logout(); router.refresh(); }} className="w-full">
+                  <Button variant='link' onClick={() => signOut({ callbackUrl: '/' })} className="w-full">
                     <LogOut />
                     Log out
                   </Button>

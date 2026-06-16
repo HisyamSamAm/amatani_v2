@@ -12,6 +12,8 @@ import Link from "next/link";
 import CategoryMenu from '@/components/public/customers/Navbar/CategoryMenu';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/shadcnUi/hover-card';
 import { Skeleton } from "@/components/shadcnUi/skeleton"; // Import Skeleton component
+import { GetProductActionPublic } from '@/app/actions/v2/public/product/productActions';
+import { GetCategoriesActionPublic } from '@/app/actions/v2/public/landingPage';
 
 export default function Product() {
     const [productsData, setProductsData] = useState([]);
@@ -38,24 +40,14 @@ export default function Product() {
 
         async function fetchProducts() {
             setIsLoading(true); // Mulai loading sebelum fetch
-            let url = `/api/v2/public/products`;
-
-            if (formattedQuery) {
-                url += `?category=${formattedQuery}`;
-            } else if (search) {
-                url += `?search=${search}`;
-            }
 
             try {
-                const result = await fetch(url, {
-                    method: "GET",
-                });
+                const data = await GetProductActionPublic({ category: formattedQuery, search });
 
-                if (result.ok) {
-                    const data = await result.json();
-                    setProductsData(data.data);
-                    if (data.data.length > 0) {
-                        setCategoryName(categoriesQuery ? data.data[0].categories_name : 'Semua Produk');
+                if (data && !data.error) {
+                    setProductsData(data);
+                    if (data.length > 0) {
+                        setCategoryName(categoriesQuery ? data[0].name : 'Semua Produk');
                     } else {
                         setCategoryName(categoriesQuery ? formattedQuery : 'Semua Produk');
                     }
@@ -92,14 +84,13 @@ export default function Product() {
     useEffect(() => {
         async function GetCategories() {
             try {
-                const result = await fetch('/api/v2/public/categories');
-                const data = await result.json();
+                const data = await GetCategoriesActionPublic();
                 console.log("🚀 ~ GetCategories ~ data:", data);
 
                 if (data && data.success && Array.isArray(data.data)) {
                     SetCategories(data.data); // Mengakses data.data
                 } else {
-                    console.error("Invalid data format from API");
+                    console.error("Invalid data format from Action");
                     SetCategories([]);
                 }
             } catch (error) {
@@ -235,14 +226,14 @@ export default function Product() {
                     // Tampilkan data produk jika ada dan tidak sedang dalam keadaan loading
                     productsData.map((product) => (
                         <ProductCard
-                            key={product.product_id}
+                            key={product.id}
                             imageSrc={product.images[0] || "/placeholder-image.png"}
-                            name={product.products_name || "Nama tidak tersedia"}
-                            category={product.categories_name || "Kategori tidak tersedia"}
+                            name={product.name || "Nama tidak tersedia"}
+                            category={product.name || "Kategori tidak tersedia"}
                             priceType={product.price_type}
                             fixedPrice={product.price}
                             wholesalePrices={product.wholesale_prices || []}
-                            product_id={product.product_id}
+                            product_id={product.id}
                             stock={product.stock}
                         />
                     ))
@@ -280,7 +271,9 @@ function ProductCard({ imageSrc, name, category, priceType, fixedPrice, wholesal
                     <Image
                         width={200}
                         height={200}
-                        src={`https://xmlmcdfzbwjljhaebzna.supabase.co/storage/v1/object/public/${imageSrc}`}
+                        src={imageSrc.startsWith('http') 
+                            ? imageSrc 
+                            : "/placeholder-image.png"}
                         alt={name}
                         className={`object-cover w-full h-full ${stock === 0 ? 'grayscale' : ''}`}
                     />

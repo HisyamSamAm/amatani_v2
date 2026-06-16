@@ -1,13 +1,17 @@
+'use server';
+
 import sql from "@/lib/postgres";
-import { supabase } from "@/lib/supabase/client";
+import { put, del } from "@vercel/blob";
 import { v4 as uuidv4 } from 'uuid';
+import { requireAdmin } from '@/lib/auth-check';
 
 export async function GetFoodCategoriesAction() {
+    await requireAdmin();
     try {
         const result = await sql`
-            SELECT lp_food_categories.*, categories.categories_name
+            SELECT lp_food_categories.*, categories.name
             FROM lp_food_categories
-            JOIN categories ON lp_food_categories.categories_id = categories.categories_id;
+            JOIN categories ON lp_food_categories.id = categories.id;
         `;
         return { success: true, data: result };
     } catch (error) {
@@ -15,9 +19,10 @@ export async function GetFoodCategoriesAction() {
         return { success: false, error: error.message };
     }
 }
-export async function InsertFoodCategoriesAction(categories_id, category_image) {
+export async function InsertFoodCategoriesAction(category_id, category_image) {
+    await requireAdmin();
     try {
-        if (!categories_id || !category_image) {
+        if (!category_id || !category_image) {
             throw new Error("Category ID and category image are required");
         }
 
@@ -27,24 +32,17 @@ export async function InsertFoodCategoriesAction(categories_id, category_image) 
         // Convert the file to a ReadableStream
         const stream = category_image.stream();
 
-        // Upload the file to Supabase storage
-        const { data, error } = await supabase.storage
-            .from('lp')
-            .upload(fileName, stream, {
-                contentType: category_image.type,
-                duplex: 'half',
-            });
+        // Upload the file to Vercel Blob
+        const blob = await put(`lp/${fileName}`, category_image, {
+            access: 'public',
+        });
 
-        if (error) {
-            throw new Error(`Failed to upload image: ${error.message}`);
-        }
-
-        const imagePath = `lp/${fileName}`;
+        const imagePath = blob.url;
 
         // Insert the image path and category id into the database
         const [result] = await sql`
-            INSERT INTO lp_food_categories (categories_id, image_path)
-            VALUES (${categories_id}, ${imagePath})
+            INSERT INTO lp_food_categories (category_id, image_path)
+            VALUES (${category_id}, ${imagePath})
             RETURNING *;
         `;
 
@@ -55,6 +53,7 @@ export async function InsertFoodCategoriesAction(categories_id, category_image) 
     }
 }
 export async function DeleteFoodCategoriesAction(fc_id) {
+    await requireAdmin();
     try {
         if (!fc_id) {
             throw new Error("Food category ID is required");
@@ -63,29 +62,20 @@ export async function DeleteFoodCategoriesAction(fc_id) {
         // Get the image path from the database
         const [category] = await sql`
             SELECT image_path FROM lp_food_categories
-            WHERE food_categories_id = ${fc_id};
+            WHERE id = ${fc_id};
         `;
 
         if (!category) {
             throw new Error('Food category not found');
         }
 
-        // Extract the file name from the image path
-        const fileName = category.image_path.split('/').pop();
-
-        // Delete the image from Supabase storage
-        const { error } = await supabase.storage
-            .from('lp')
-            .remove([fileName]);
-
-        if (error) {
-            throw new Error(`Failed to delete image: ${error.message}`);
-        }
+        // Delete the image from Vercel Blob
+        await del(category.image_path);
 
         // Delete the image path from the database
         const result = await sql`
             DELETE FROM lp_food_categories
-            WHERE food_categories_id = ${fc_id}
+            WHERE id = ${fc_id}
             RETURNING *;
         `;
 

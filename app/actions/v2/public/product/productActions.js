@@ -2,64 +2,58 @@
 
 import sql from "@/lib/postgres";
 
-export async function GetProductActionPublic(req, { params }) {
-    const url = new URL(req.url);
-    const searchQuery = url.searchParams.get('search');
-    const category = url.searchParams.get('category');
-    const sort = url.searchParams.get('sort');
-    const limit = parseInt(url.searchParams.get('limit')) || 10;
-    const offset = parseInt(url.searchParams.get('offset')) || 0;
+export async function GetProductActionPublic({ search: searchQuery, category, sort, limit = 10, offset = 0 } = {}) {
 
     try {
         let query = sql`
             SELECT 
-                p.product_id,
-                p.products_name,
-                p.products_description,
+                p.id,
+                p.name,
+                p.description,
                 p.stock,
-                p.categories_id,
-                c.categories_name,
+                p.category_id,
+                c.name,
                 p.price_type,
                 f.price,
                 (
                     SELECT json_agg(json_build_object('min_quantity', w.min_quantity, 'max_quantity', w.max_quantity, 'price', w.price))
                     FROM wholesale_prices w
-                    WHERE w.product_id = p.product_id
+                    WHERE w.product_id = p.id
                 ) AS wholesale_prices,
                 (
                     SELECT json_agg(pi.image_path)
                     FROM product_images pi
-                    WHERE pi.product_id = p.product_id
+                    WHERE pi.product_id = p.id
                 ) AS images,
                 p.created_at
             FROM 
                 products p
             LEFT JOIN 
-                fixed_prices f ON p.product_id = f.product_id AND p.price_type = 'fixed'
+                fixed_prices f ON p.id = f.product_id AND p.price_type = 'fixed'
             LEFT JOIN 
-                categories c ON p.categories_id = c.categories_id
+                categories c ON p.category_id = c.id
         `;
 
         // Menambahkan WHERE clause jika ada filter
         if (searchQuery && category) {
             query = sql`${query} 
-                WHERE (p.products_name ILIKE ${'%' + searchQuery + '%'} 
-                OR p.products_description ILIKE ${'%' + searchQuery + '%'}) 
-                AND c.categories_name ILIKE ${'%' + category + '%'}`;
+                WHERE (p.name ILIKE ${'%' + searchQuery + '%'} 
+                OR p.description ILIKE ${'%' + searchQuery + '%'}) 
+                AND c.name ILIKE ${'%' + category + '%'}`;
         } else if (searchQuery) {
             query = sql`${query} 
-                WHERE p.products_name ILIKE ${'%' + searchQuery + '%'} 
-                OR p.products_description ILIKE ${'%' + searchQuery + '%'}`;
+                WHERE p.name ILIKE ${'%' + searchQuery + '%'} 
+                OR p.description ILIKE ${'%' + searchQuery + '%'}`;
         } else if (category) {
             query = sql`${query} 
-                WHERE c.categories_name ILIKE ${'%' + category + '%'}`;
+                WHERE c.name ILIKE ${'%' + category + '%'}`;
         }
 
         // Menambahkan ORDER BY clause
         if (sort === 'A-Z') {
-            query = sql`${query} ORDER BY p.products_name ASC`;
+            query = sql`${query} ORDER BY p.name ASC`;
         } else if (sort === 'Z-A') {
-            query = sql`${query} ORDER BY p.products_name DESC`;
+            query = sql`${query} ORDER BY p.name DESC`;
         } else if (sort === 'Newest') {
             query = sql`${query} ORDER BY p.created_at DESC`;
         } else if (sort === 'Oldest') {
@@ -78,40 +72,40 @@ export async function GetProductActionPublic(req, { params }) {
         return { error: "Failed to fetch products", details: error.message };
     }
 }
-export async function GetProductDetailActionCustomers(request, { params }) {
+export async function GetProductDetailActionCustomers({ product_id }) {
     try {
-        const data = await params.product_id;
+        const data = product_id;
 
         // Query untuk mendapatkan data produk berdasarkan kategori yang sesuai dengan query
         const result = await sql`
             SELECT 
-                p.product_id,
-                p.products_name,
-                p.products_description,
+                p.id,
+                p.name,
+                p.description,
                 p.stock,
-                p.categories_id,
-                c.categories_name,
+                p.category_id,
+                c.name AS category_name,
                 p.created_at,
                 p.price_type,
                 f.price AS fixed_price,
                 (
                     SELECT json_agg(json_build_object('min_quantity', w.min_quantity, 'max_quantity', w.max_quantity, 'price', w.price))
                     FROM wholesale_prices w
-                    WHERE w.product_id = p.product_id
+                    WHERE w.product_id = p.id
                 ) AS wholesale_prices,
                 (
                     SELECT json_agg(pi.image_path)
                     FROM product_images pi
-                    WHERE pi.product_id = p.product_id
+                    WHERE pi.product_id = p.id
                 ) AS images
             FROM 
                 products p
             LEFT JOIN 
-                fixed_prices f ON p.product_id = f.product_id AND p.price_type = 'fixed'
+                fixed_prices f ON p.id = f.product_id AND p.price_type = 'fixed'
             LEFT JOIN 
-                categories c ON p.categories_id = c.categories_id
+                categories c ON p.category_id = c.id
             WHERE 
-                p.product_id = ${data}
+                p.id = ${data}
         `;
 
         console.log("Query result:", result);

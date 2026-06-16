@@ -8,25 +8,26 @@ import { Separator } from "@/components/shadcnUi/separator";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/shadcnUi/breadcrumb";
 import FAQForm from "@/components/dashboard/faq/FaqForm";
 import { toast, Toaster } from "sonner";
+import { GetFaqByIdAction, UpdateFaqByIdAction } from "@/app/actions/v2/dashboard/admin/faq/faqActions";
 
 export default function EditFaqPage() {
     const router = useRouter();
     const { faq_id } = useParams();
     const [faq, setFaq] = useState(null);
-    console.log("🚀 ~ EditFaqPage ~ faq:", faq)
+
 
     useEffect(() => {
         const fetchFaq = async () => {
             try {
-                const response = await fetch(`/api/v2/admin/faq/${faq_id}`);
-                if (!response.ok) {
-                    throw new Error('Failed to fetch FAQ');
+                const data = await GetFaqByIdAction(faq_id);
+                if (data && !data.error) {
+                    setFaq(data);
+                } else {
+                    throw new Error(data?.error || 'Failed to fetch FAQ');
                 }
-                const data = await response.json();
-                setFaq(data.data);
             } catch (error) {
                 console.error('Error fetching FAQ:', error);
-                alert('Failed to fetch FAQ');
+                toast.error('Failed to fetch FAQ');
             }
         };
         fetchFaq();
@@ -40,31 +41,22 @@ export default function EditFaqPage() {
         formData.append('content', params.content);
         formData.append('category_id', params.category.category_id);
 
-        // Menampilkan toast loading
         toast.loading("Updating FAQ...", { id: "update-faq" });
 
         try {
-            const result = await fetch(`/api/v2/admin/faq/${faq_id}`, {
-                method: 'PUT',
-                body: formData
-            });
+            const data = await UpdateFaqByIdAction(faq_id, formData);
 
-            if (result.ok) {
-                const data = await result.json();
+            if (data && !data.error) {
                 console.log('result =', data);
                 console.log('FAQ berhasil diupdate');
-                // Memperbarui toast menjadi success
                 toast.success("FAQ updated successfully", { id: "update-faq" });
                 return;
             } else {
-                const errorData = await result.json();
-                console.error('Error:', errorData);
-                // Memperbarui toast menjadi error
-                toast.error("Failed to update FAQ", { id: "update-faq" });
+                console.error('Error:', data?.error);
+                toast.error(data?.error || "Failed to update FAQ", { id: "update-faq" });
             }
         } catch (error) {
             console.error('Error:', error);
-            // Memperbarui toast menjadi error
             toast.error("Failed to update FAQ", { id: "update-faq" });
         }
     };

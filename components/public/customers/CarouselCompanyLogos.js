@@ -6,6 +6,7 @@ import { AspectRatio } from "@/components/shadcnUi/aspect-ratio";
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { Skeleton } from "@/components/shadcnUi/skeleton";
+import { GetCompanyLogosActionPublic } from "@/app/actions/v2/public/landingPage";
 
 export default function CompanyLogosCarousel() {
     const [companyLogos, setCompanyLogos] = useState([]);
@@ -16,12 +17,11 @@ export default function CompanyLogosCarousel() {
     useEffect(() => {
         const fetchCompanyLogos = async () => {
             try {
-                const response = await fetch('/api/v2/public/lp/company_logos');
-                if (!response.ok) {
-                    throw new Error('Failed to fetch company logos');
+                const response = await GetCompanyLogosActionPublic();
+                if (!response.success) {
+                    throw new Error(response.error || 'Failed to fetch company logos');
                 }
-                const data = await response.json();
-                setCompanyLogos(data.data);
+                setCompanyLogos(response.data);
                 setIsLoading(false);
             } catch (error) {
                 console.error('Error fetching company logos:', error);
@@ -99,12 +99,12 @@ export default function CompanyLogosCarousel() {
                     >
                         <CarouselContent className="-ml-2 md:-ml-4">
                             {companyLogos.map((logo, index) => (
-                                <CarouselItem key={logo.cp_id} className="pl-2 md:pl-4 basis-1/4">
+                                <CarouselItem key={logo.id} className="pl-2 md:pl-4 basis-1/4">
                                     <Card className="border-none shadow-none">
                                         <CardContent className="p-2">
                                             <AspectRatio ratio={1 / 1} className="bg-white">
                                                 <Image
-                                                    src={`https://xmlmcdfzbwjljhaebzna.supabase.co/storage/v1/object/public/${logo.image_path}`}
+                                                    src={logo.image_path}
                                                     alt={`Company Logo ${index + 1}`}
                                                     fill
                                                     className="object-contain p-2"

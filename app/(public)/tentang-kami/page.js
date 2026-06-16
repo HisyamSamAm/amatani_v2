@@ -3,75 +3,15 @@ import { AspectRatio } from "@/components/shadcnUi/aspect-ratio";
 import { AlertCircle, Users, ShoppingCart, Globe } from "lucide-react";
 import Image from "next/image";
 
+export const metadata = {
+  title: "Tentang Kami | Amatani",
+  description: "Pelajari lebih lanjut tentang misi, visi, dan komitmen Amatani dalam menyediakan produk pertanian segar dan berkualitas.",
+};
+
 export default function TentangKami() {
     return (
         <div className="container mx-auto py-20 px-6 lg:px-16">
-            {/* <h1 className="text-5xl font-bold text-center text-gray-800 mb-12">Tentang Kami</h1>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-12 mb-20">
-                
-                <Card>
-                    <CardHeader className="p-0">
-                        <AspectRatio ratio={16 / 9}>
-                            <Image
-                                src="/buah-buahan/img01.png"
-                                alt="Kerjasama"
-                                className="object-cover w-full h-full rounded-t-lg"
-                                width={200}
-                                height={200}
-                            />
-                        </AspectRatio>
-                    </CardHeader>
-                    <CardContent className="p-6">
-                        <h2 className="text-2xl font-semibold text-gray-800 mb-2">Cerita Kami</h2>
-                        <p className="text-gray-600 text-base leading-relaxed">
-                            Kami memulai perjalanan dengan komitmen untuk menyediakan produk berkualitas tinggi, memastikan kepuasan pelanggan, dan mendukung komunitas kami.
-                        </p>
-                    </CardContent>
-                </Card>
-
-                
-                <Card>
-                    <CardHeader className="p-0">
-                        <AspectRatio ratio={16 / 9}>
-                            <Image
-                                src="/buah-buahan/img01.png"
-                                alt="Kerjasama"
-                                className="object-cover w-full h-full rounded-t-lg"
-                                width={200}
-                                height={200}
-                            />
-                        </AspectRatio>
-                    </CardHeader>
-                    <CardContent className="p-6">
-                        <h2 className="text-2xl font-semibold text-gray-800 mb-2">Misi Kami</h2>
-                        <p className="text-gray-600 text-base leading-relaxed">
-                            Memberikan pengalaman belanja yang mudah, cepat, dan aman dengan beragam produk pilihan terbaik untuk kebutuhan Anda.
-                        </p>
-                    </CardContent>
-                </Card>
-
-                
-                <Card>
-                    <CardHeader className="p-0">
-                        <AspectRatio ratio={16 / 9}>
-                            <Image
-                                src="/buah-buahan/img01.png"
-                                alt="Kerjasama"
-                                className="object-cover w-full h-full rounded-t-lg"
-                                width={200}
-                                height={200}
-                            />
-                        </AspectRatio>
-                    </CardHeader>
-                    <CardContent className="p-6">
-                        <h2 className="text-2xl font-semibold text-gray-800 mb-2">Tim Kami</h2>
-                        <p className="text-gray-600 text-base leading-relaxed">
-                            Tim kami terdiri dari para profesional yang berdedikasi untuk memberikan layanan terbaik kepada pelanggan di seluruh dunia.
-                        </p>
-                    </CardContent>
-                </Card>
-            </div> */}
 
             <div className="text-center mb-16">
                 <h2 className="text-4xl font-bold text-gray-800 mb-6">Mengapa Memilih Kami?</h2>

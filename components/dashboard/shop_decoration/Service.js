@@ -15,7 +15,8 @@ import { useState, useTransition, useRef, useEffect, useCallback } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Progress } from '@/components/shadcnUi/progress';
 import ServicePreview from './previewcomponent/ServicePreview';
-import { AspectRatio } from "@/components/shadcnUi/aspect-ratio"
+import { AspectRatio } from "@/components/shadcnUi/aspect-ratio";
+import { GetServiceAction, InsertServiceAction, DeleteServiceAction } from "@/app/actions/v2/dashboard/admin/sd/serviceActions";
 
 const formSchema = z.object({
     serviceName: z.string().min(1, { message: "Tidak boleh kosong" }),
@@ -50,12 +51,12 @@ export default function Service() {
     // Fungsi untuk mengambil data service dari API
     const fetchServiceList = async () => {
         try {
-            const response = await fetch('/api/v2/admin/sd/service');
-            if (!response.ok) {
-                throw new Error('Failed to fetch service list');
+            const result = await GetServiceAction();
+            if (result.success) {
+                setServiceList(result.data);
+            } else {
+                console.error('Failed to fetch service list:', result.error);
             }
-            const data = await response.json();
-            setServiceList(data.data);
         } catch (error) {
             console.error('Error fetching service list:', error);
         }
@@ -67,34 +68,26 @@ export default function Service() {
 
         startDeleteTransition(async () => {
             try {
-                const response = await fetch(`/api/v2/admin/sd/service/${service_id}`, {
-                    method: 'DELETE',
-                });
+                const result = await DeleteServiceAction(service_id);
 
-                if (!response.ok) {
-                    throw new Error('Failed to delete service');
+                if (!result.success) {
+                    throw new Error(result.error || 'Failed to delete service');
                 }
 
-                const result = await response.json();
-                console.log('Service deleted successfully:', result);
-
-                // Tampilkan atau perbarui toast jika berhasil
+                console.log('Service deleted successfully:', result.data);
                 toast.success("Service berhasil dihapus!", {
                     id: toastId,
                     description: "Service telah berhasil dihapus.",
                     duration: 3000,
                 });
 
-                // Fetch service list again to update the list
                 fetchServiceList();
-                setRefreshPreview(prev => !prev); // Trigger refresh for ServicePreview
+                setRefreshPreview(prev => !prev);
             } catch (error) {
                 console.error('Error deleting service:', error);
-
-                // Tampilkan atau perbarui toast jika gagal
                 toast.error("Gagal menghapus service", {
                     id: toastId,
-                    description: "Terjadi kesalahan saat menghapus service.",
+                    description: error.message || "Terjadi kesalahan saat menghapus service.",
                     duration: 3000,
                 });
             }
@@ -111,26 +104,16 @@ export default function Service() {
 
         startTransition(async () => {
             try {
-                const formData = new FormData();
-                formData.append('service_name', data.serviceName);
-                formData.append('image', data.logo[0]);
-
                 setIsLoading(true);
                 setProgress(0);
 
-                const response = await fetch('/api/v2/admin/sd/service', {
-                    method: 'POST',
-                    body: formData,
-                    duplex: 'half', // Add duplex option
-                });
+                const result = await InsertServiceAction(data.serviceName, data.logo[0]);
 
-                if (!response.ok) {
-                    throw new Error('Failed to insert service');
+                if (!result.success) {
+                    throw new Error(result.error || 'Failed to insert service');
                 }
 
-                const result = await response.json();
-                console.log('Service inserted successfully:', result);
-
+                console.log('Service inserted successfully:', result.data);
                 toast.success("Data berhasil disimpan!", {
                     id: toastId,
                     description: "Service telah berhasil diperbarui.",
@@ -138,19 +121,16 @@ export default function Service() {
                 });
 
                 form.reset();
-                if (fileInputRef.current) {
-                    fileInputRef.current.value = null; // Reset file input
-                }
-
+                if (fileInputRef.current) fileInputRef.current.value = null;
                 fetchServiceList();
-                setRefreshPreview(prev => !prev); // Trigger refresh for ServicePreview
+                setRefreshPreview(prev => !prev);
                 setPreview(null);
                 setIsLoading(false);
             } catch (error) {
                 console.error('Error submitting form:', error);
                 toast.error("Gagal menyimpan data", {
                     id: toastId,
-                    description: "Terjadi kesalahan saat menyimpan data.",
+                    description: error.message || "Terjadi kesalahan saat menyimpan data.",
                     duration: 3000,
                 });
                 setIsLoading(false);
@@ -195,10 +175,10 @@ export default function Service() {
                                                 <div className="p-4">
                                                     <div className="grid grid-cols-1 gap-4">
                                                         {serviceList.map((service) => (
-                                                            <div key={service.service_id} className="flex items-center justify-between p-2 border rounded-lg w-full">
+                                                            <div key={service.id} className="flex items-center justify-between p-2 border rounded-lg w-full">
                                                                 <div className="flex items-center">
                                                                     <Image
-                                                                        src={`https://xmlmcdfzbwjljhaebzna.supabase.co/storage/v1/object/public/${service.image_path}`}
+                                                                        src={service.image_path}
                                                                         alt="Service Logo"
                                                                         width={100}
                                                                         height={100}
@@ -206,13 +186,14 @@ export default function Service() {
                                                                     />
                                                                 </div>
                                                                 <div className="flex items-center">
-                                                                    <span className="ml-4">{service.service_name}</span>
+                                                                    <span className="ml-4">{service.name}</span>
                                                                 </div>
                                                                 <div className="flex items-center justify-end">
                                                                     <AlertDialog>
                                                                         <AlertDialogTrigger asChild>
                                                                             <Button
                                                                                 variant="outline"
+                                                                                size="sm"
                                                                                 className="ml-4"
                                                                                 disabled={isDeleting}
                                                                             >
@@ -228,7 +209,10 @@ export default function Service() {
                                                                             </AlertDialogHeader>
                                                                             <AlertDialogFooter>
                                                                                 <AlertDialogCancel>Batal</AlertDialogCancel>
-                                                                                <AlertDialogAction onClick={() => handleDelete(service.service_id)} disabled={isDeleting}>
+                                                                                <AlertDialogAction onClick={(e) => {
+                                                                                    e.preventDefault();
+                                                                                    handleDelete(service.id);
+                                                                                }} disabled={isDeleting}>
                                                                                     {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Hapus'}
                                                                                 </AlertDialogAction>
                                                                             </AlertDialogFooter>

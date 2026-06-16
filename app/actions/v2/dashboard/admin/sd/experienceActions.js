@@ -1,9 +1,11 @@
 'use server';
 
 import sql from "@/lib/postgres";
+import { requireAdmin } from '@/lib/auth-check';
 
 
 export async function GetExperiencesAction() {
+    await requireAdmin();
     try {
         const experiences = await sql`SELECT * FROM lp_experience`;
         return { success: true, data: experiences };
@@ -13,6 +15,7 @@ export async function GetExperiencesAction() {
     }
 }
 export async function InsertExperienceAction(number, description) {
+    await requireAdmin();
     try {
         if (!number || !description) {
             throw new Error("Number and description are required");
@@ -26,10 +29,11 @@ export async function InsertExperienceAction(number, description) {
     }
 }
 
-export async function DeleteExperienceAction(experience_id) {
+export async function DeleteExperienceAction(id) {
+    await requireAdmin();
     try {
         const result =
-            await sql`delete from lp_experience where experience_id = ${experience_id} returning *`;
+            await sql`delete from lp_experience where id = ${id} returning *`;
         if (result.length === 0) {
             return { success: false, message: "Experience not found" };
         }

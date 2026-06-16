@@ -3,75 +3,15 @@ import { AspectRatio } from "@/components/shadcnUi/aspect-ratio";
 import { Phone, Mail, MapPin } from "lucide-react";
 import Image from "next/image";
 
+export const metadata = {
+  title: "Bekerja Sama | Amatani",
+  description: "Hubungi Amatani untuk peluang kerjasama bisnis dan kemitraan pasokan pertanian.",
+};
+
 export default function BekerjaSama() {
     return (
         <div className="container mx-auto py-20 px-6 lg:px-16">
-            {/* <h1 className="text-5xl font-bold text-center text-gray-800 mb-12">Bekerja Sama</h1> */}
 
-            {/* <div className="grid grid-cols-1 md:grid-cols-3 gap-12 mb-16">
-                
-                <Card>
-                    <CardHeader className="p-0">
-                        <AspectRatio ratio={16 / 9}>
-                            <Image
-                                src="/buah-buahan/img01.png"
-                                alt="Kerjasama"
-                                className="object-cover w-full h-full rounded-t-lg"
-                                width={200}
-                                height={200}
-                            />
-                        </AspectRatio>
-                    </CardHeader>
-                    <CardContent className="p-6">
-                        <h2 className="text-2xl font-semibold text-gray-800 mb-2">
-                            Mengapa Bekerja Sama dengan Kami?
-                        </h2>
-                        <p className="text-gray-600 text-base leading-relaxed">
-                            Kami menawarkan peluang kerjasama yang saling menguntungkan dengan berbagai manfaat, inovasi, dan dukungan penuh.
-                        </p>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader className="p-0">
-                        <AspectRatio ratio={16 / 9}>
-                            <Image
-                                src="/buah-buahan/img01.png"
-                                alt="Manfaat Kerjasama"
-                                className="object-cover w-full h-full rounded-t-lg"
-                                width={200}
-                                height={200}
-                            />
-                        </AspectRatio>
-                    </CardHeader>
-                    <CardContent className="p-6">
-                        <h2 className="text-2xl font-semibold text-gray-800 mb-2">Manfaat Kerjasama</h2>
-                        <p className="text-gray-600 text-base leading-relaxed">
-                            Nikmati akses ke jaringan luas kami, dukungan pemasaran strategis, serta solusi bisnis yang inovatif.
-                        </p>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader className="p-0">
-                        <AspectRatio ratio={16 / 9}>
-                            <Image
-                                src="/buah-buahan/img01.png"
-                                alt="Dukungan Kami"
-                                className="object-cover w-full h-full rounded-t-lg"
-                                width={200}
-                                height={200}
-                            />
-                        </AspectRatio>
-                    </CardHeader>
-                    <CardContent className="p-6">
-                        <h2 className="text-2xl font-semibold text-gray-800 mb-2">Dukungan Kami</h2>
-                        <p className="text-gray-600 text-base leading-relaxed">
-                            Kami menyediakan dukungan penuh untuk memastikan keberhasilan semua mitra kerja kami.
-                        </p>
-                    </CardContent>
-                </Card>
-            </div> */}
 
             <div className="text-center mb-12">
                 <h2 className="text-4xl font-bold text-gray-800 mb-6">Hubungi Kami</h2>

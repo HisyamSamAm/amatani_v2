@@ -1,76 +1,53 @@
-
-// export async function GetFaqAction(req, params) {
-//     try {
-//         // const url = new URL(req.url);
-//         // const category = url.searchParams.get('category');
-//         // const query = url.searchParams.get('query');
-//         const faqs = await sql`
-//             SELECT f.*, c.name AS category_name
-//             FROM faq f
-//             LEFT JOIN faq_category c ON f.category_id = c.category_id
-//             -- ${category ? sql`WHERE f.category_id = ${category}` : sql``}
-//             -- ${category && query ? sql`AND (f.title ILIKE ${"%" + query + "%"} OR f.content ILIKE ${"%" + query + "%"})` : query ? sql`WHERE (f.title ILIKE ${"%" + query + "%"} OR f.content ILIKE ${"%" + query + "%"})` : sql``}
-//             ORDER BY f.created_at DESC
-//         `;
-//         return faqs;
-//     } catch (error) {
-//         console.error("Error fetching FAQs:", error);
-//         throw error;
-//     }
-// }
-
 "use server";
 
 import sql from "@/lib/postgres";
+import { requireAdmin } from "@/lib/auth-check";
 
-export async function GetFaqAction(req, params) {
-    const searchParams = req.nextUrl.searchParams;
-    const category = searchParams.get("category");
-    const search = searchParams.get("search");
-
+export async function GetFaqAction({ category, search } = {}) {
+    await requireAdmin();
     try {
         let faqs;
         if (category) {
-            // Modify the query to filter by category_id instead of category_name
+            // Modify the query to filter by category_id instead of name
             faqs = await sql`
                   SELECT
-                      f.faq_id,
+                      f.id,
                       f.title,
                       f.content,
-                      c.category_id,
-                      c.category_name,
+                      c.id as category_id,
+                      c.name,
                       f.created_at
                   FROM faq f
-                  LEFT JOIN faq_category c ON f.category_id = c.category_id
+                  LEFT JOIN faq_category c ON f.category_id = c.id
                   WHERE f.category_id = ${category}
                   ORDER BY f.created_at DESC
               `;
         } else if (search) {
             faqs = await sql`
                   SELECT
-                      f.faq_id,
+                      f.id,
                       f.title,
                       f.content,
-                      c.category_id,
-                      c.category_name,
+                      c.id as category_id,
+                      c.name,
                       f.created_at
                   FROM faq f
-                  LEFT JOIN faq_category c ON f.category_id = c.category_id
+                  LEFT JOIN faq_category c ON f.category_id = c.id
                   WHERE (f.title ILIKE ${"%" + search + "%"} OR f.content ILIKE ${"%" + search + "%"
-                } OR c.category_name ILIKE ${"%" + category + "%"})
+                } OR c.name ILIKE ${"%" + search + "%"})
                   ORDER BY f.created_at DESC
               `;
         } else {
             faqs = await sql`
                   SELECT
-                      f.faq_id,
+                      f.id,
                       f.title,
                       f.content,
-                      c.category_id,
-                      c.category_name,
+                      c.id as category_id,
+                      c.name,
                       f.created_at
                   FROM faq f
-                  LEFT JOIN faq_category c ON f.category_id = c.category_id
+                  LEFT JOIN faq_category c ON f.category_id = c.id
                   ORDER BY f.created_at DESC
               `;
         }
@@ -81,26 +58,26 @@ export async function GetFaqAction(req, params) {
     }
 }
 
-export async function GetFaqByIdAction(req, { params }) {
+export async function GetFaqByIdAction(faq_id) {
+    await requireAdmin();
     try {
-        const faq_id = await params.faq_id;
-        console.log("🚀 ~ GetFaqByIdAction ~ faq_id:", faq_id)
+
         const [faq] = await sql`
             SELECT
-                f.faq_id,
+                f.id,
                 f.title,
                 f.content,
                 f.category_id,
-                c.category_name,
+                c.name,
                 f.created_at
             FROM
                 public.faq f
             LEFT JOIN
                 public.faq_category c
             ON
-                f.category_id = c.category_id
+                f.category_id = c.id
             WHERE
-                f.faq_id = ${faq_id};
+                f.id = ${faq_id};
         `;
         return faq;
     } catch (error) {
@@ -109,16 +86,13 @@ export async function GetFaqByIdAction(req, { params }) {
     }
 }
 
-export async function InsertFaqAction(req, { params }) {
-
-    const formData = await req.formData();
+export async function InsertFaqAction(formData) {
+    await requireAdmin();
     const title = formData.get('title');
     const content = formData.get('content');
     const category_id = formData.get('category_id');
 
-    console.log("🚀 ~ POST ~ title:", title)
-    console.log("🚀 ~ POST ~ content:", content)
-    console.log("🚀 ~ POST ~ category_id:", category_id)
+
 
     try {
         const result = await sql.begin(async (sql) => {
@@ -143,13 +117,13 @@ export async function InsertFaqAction(req, { params }) {
     }
 }
 
-export async function DeleteFaqAction(req, { params }) {
+export async function DeleteFaqAction(faq_id) {
+    await requireAdmin();
     try {
-        const faq_id = await params.faq_id;
-        console.log("🚀 ~ DeleteFaqAction ~ faq_id:", faq_id)
 
 
-        const result = await sql`delete from faq where faq_id = ${faq_id} returning *`;
+
+        const result = await sql`delete from faq where id = ${faq_id} returning *`;
         return result;
     } catch (error) {
         console.error("Error deleting FAQ:", error);
@@ -157,18 +131,14 @@ export async function DeleteFaqAction(req, { params }) {
     }
 }
 
-export async function UpdateFaqByIdAction(req, { params }) {
-    const formData = await req.formData();
+export async function UpdateFaqByIdAction(faq_id, formData) {
+    await requireAdmin();
     const title = formData.get('title');
     const content = formData.get('content');
     const category_id = formData.get('category_id');
-    const faq_id = await params.faq_id;
 
 
-    console.log("🚀 ~ POST ~ title:", title)
-    console.log("🚀 ~ POST ~ content:", content)
-    console.log("🚀 ~ POST ~ category_id:", category_id)
-    console.log("🚀 ~ POST ~ faq_id:", faq_id)
+
 
     if (!title || !content || !category_id) {
         throw new Error("Invalid input: all fields are required");
@@ -187,7 +157,7 @@ export async function UpdateFaqByIdAction(req, { params }) {
                     content = ${content},
                     category_id = ${category_id}
                 WHERE 
-                    faq_id = ${faq_id}
+                    id = ${faq_id}
                 RETURNING *
             `;
             console.log("Updated FAQ:", updatedFaq);

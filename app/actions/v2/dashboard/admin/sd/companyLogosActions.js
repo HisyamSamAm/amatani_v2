@@ -1,8 +1,12 @@
+'use server';
+
 import sql from "@/lib/postgres";
-import { supabase } from "@/lib/supabase/client";
+import { put, del } from "@vercel/blob";
 import { v4 as uuidv4 } from 'uuid';
+import { requireAdmin } from '@/lib/auth-check';
 
 export async function InsertCompanyLogoAction(logo) {
+    await requireAdmin();
     try {
         if (!logo) {
             throw new Error("Logo image is required");
@@ -14,19 +18,12 @@ export async function InsertCompanyLogoAction(logo) {
         // Convert the file to a ReadableStream
         const stream = logo.stream();
 
-        // Upload the file to Supabase storage
-        const { data, error } = await supabase.storage
-            .from('lp')
-            .upload(fileName, stream, {
-                contentType: logo.type,
-                duplex: 'half',
-            });
+        // Upload the file to Vercel Blob
+        const blob = await put(`lp/${fileName}`, logo, {
+            access: 'public',
+        });
 
-        if (error) {
-            throw new Error(`Failed to upload image: ${error.message}`);
-        }
-
-        const imagePath = `lp/${fileName}`;
+        const imagePath = blob.url;
 
         // Insert the image path into the database
         const [result] = await sql`
@@ -42,6 +39,7 @@ export async function InsertCompanyLogoAction(logo) {
     }
 }
 export async function GetCompanyLogosAction() {
+    await requireAdmin();
     try {
         const result = await sql`
             SELECT * FROM lp_company_logos;
@@ -53,38 +51,30 @@ export async function GetCompanyLogosAction() {
     }
 }
 
-export async function DeleteCompanyLogoAction(cp_id) {
+export async function DeleteCompanyLogoAction(id) {
+    await requireAdmin();
     try {
-        if (!cp_id) {
+        if (!id) {
             throw new Error("Company logo ID is required");
         }
 
         // Get the image path from the database
         const [logo] = await sql`
             SELECT image_path FROM lp_company_logos
-            WHERE cp_id = ${cp_id};
+            WHERE id = ${id};
         `;
 
         if (!logo) {
             throw new Error('Logo not found');
         }
 
-        // Extract the file name from the image path
-        const fileName = logo.image_path.split('/').pop();
-
-        // Delete the image from Supabase storage
-        const { error } = await supabase.storage
-            .from('lp')
-            .remove([fileName]);
-
-        if (error) {
-            throw new Error(`Failed to delete image: ${error.message}`);
-        }
+        // Delete the image from Vercel Blob
+        await del(logo.image_path);
 
         // Delete the image path from the database
         const result = await sql`
             DELETE FROM lp_company_logos
-            WHERE cp_id = ${cp_id}
+            WHERE id = ${id}
             RETURNING *;
         `;
 

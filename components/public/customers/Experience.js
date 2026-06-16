@@ -1,6 +1,7 @@
 'use client';
 import React, { useEffect, useState } from "react";
 import { Skeleton } from "@/components/shadcnUi/skeleton";
+import { GetExperiencesActionPublic } from "@/app/actions/v2/public/landingPage";
 
 export default function Experience({ fetchTrigger }) {
     const [stats, setStats] = useState([]);
@@ -9,12 +10,11 @@ export default function Experience({ fetchTrigger }) {
     const fetchStatistics = async () => {
         setIsLoading(true); // Set loading menjadi true sebelum fetch
         try {
-            const response = await fetch('/api/v2/public/lp/experience');
-            if (!response.ok) {
-                throw new Error('Failed to fetch statistics');
+            const response = await GetExperiencesActionPublic();
+            if (!response.success) {
+                throw new Error(response.error || 'Failed to fetch statistics');
             }
-            const data = await response.json();
-            setStats(data.data);
+            setStats(response.data);
         } catch (error) {
             console.error('Error fetching statistics:', error);
         } finally {

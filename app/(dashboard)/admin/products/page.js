@@ -5,6 +5,7 @@ import { Button } from "@/components/shadcnUi/button";
 import { Input } from "@/components/shadcnUi/input";
 import { Edit, Trash, Plus, SortDesc, Search, X, Loader2 } from 'lucide-react';
 import Link from "next/link";
+import { GetProductAction, DeleteProductAction } from "@/app/actions/v2/dashboard/admin/products/productsActions";
 import { SidebarTrigger } from "@/components/shadcnUi/sidebar";
 import { Separator } from "@/components/shadcnUi/separator";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/shadcnUi/breadcrumb";
@@ -19,6 +20,8 @@ import {
 import { ArrowUpAZ, ArrowDownAZ, ArrowDownWideNarrow, ArrowUpWideNarrow } from 'lucide-react'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/shadcnUi/alert-dialog";
 import { Toaster, toast } from "sonner";
+import { EmptyState } from "@/components/shadcnUi/empty-state";
+import { PackageOpen } from "lucide-react";
 
 // Komponen Reusable untuk Rentang Harga
 const PriceRange = ({ label, price }) => (
@@ -32,7 +35,8 @@ const PriceRange = ({ label, price }) => (
 const ActionButtons = ({ product_id, onDelete }) => {
     const [isPending, startTransition] = useTransition();
 
-    const handleDelete = () => {
+    const handleDelete = (e) => {
+        e.preventDefault();
         startTransition(async () => {
             try {
                 await onDelete(product_id);
@@ -113,8 +117,10 @@ const ProductCard = ({ product, onDelete }) => {
                     <Image
                         width={200}
                         height={200}
-                        src={`https://xmlmcdfzbwjljhaebzna.supabase.co/storage/v1/object/public/${product.images[0]}`}
-                        alt={product.products_name}
+                        src={product.images[0].startsWith('http') 
+                            ? product.images[0] 
+                            : "/placeholder-image.png"}
+                        alt={product.name}
                         className="object-cover w-full h-full rounded-lg"
                     />
                 )}
@@ -125,10 +131,10 @@ const ProductCard = ({ product, onDelete }) => {
                         {product.price_type === 'wholesale' ? 'Grosir' : 'Harga Tetap'}
                     </Badge>
                     <Badge className="text-red-400 bg-red-100 hover:bg-rose-200 hover:text-red-600">
-                        {product.categories_name}
+                        {product.name}
                     </Badge>
                 </div>
-                <h2 className="text-sm sm:text-base font-semibold text-black">{product.products_name}</h2>
+                <h2 className="text-sm sm:text-base font-semibold text-black">{product.name}</h2>
             </div>
             <div className="flex flex-1 justify-start gap-8">
                 {priceRanges}
@@ -176,21 +182,10 @@ export default function ProductPage() {
         while (currentRetry < maxRetries) {
             try {
                 setLoading(true);
-                const url = new URL('/api/v2/admin/products', window.location.origin);
-                if (query) url.searchParams.append('search', query);
-                if (sort) url.searchParams.append('sort', sort);
-                url.searchParams.append('limit', limit.toString());
-                url.searchParams.append('offset', offset.toString());
-
-                const response = await fetch(url.toString());
-                const data = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(data.message || `HTTP error! status: ${response.status}`);
-                }
+                const data = await GetProductAction({ searchQuery: query, sort, limit, offset });
 
                 // Pastikan data adalah array
-                const productsArray = Array.isArray(data.data) ? data.data : [];
+                const productsArray = Array.isArray(data) ? data : [];
 
                 if (offset === 0) {
                     setProducts(productsArray);
@@ -252,14 +247,11 @@ export default function ProductPage() {
 
     const handleDeleteProduct = useCallback(async (productId) => {
         try {
-            const response = await fetch(`/api/v2/admin/products/${productId}`, {
-                method: 'DELETE',
-            });
-            if (!response.ok) {
-                throw new Error('Failed to delete product');
+            const res = await DeleteProductAction(productId);
+            if (res && res.error) {
+                throw new Error(res.error);
             }
-            await response.json();
-            setProducts(prevProducts => prevProducts.filter(product => product.product_id !== productId));
+            setProducts(prevProducts => prevProducts.filter(product => product.id !== productId));
         } catch (error) {
             console.error("Error deleting product:", error);
             toast.error("Failed to delete product");
@@ -394,18 +386,24 @@ export default function ProductPage() {
                             <ProductCardSkeleton key={index} />
                         ))
                     ) : products.length === 0 ? (
-                        <p className="text-center text-gray-500">Tidak ada produk yang tersedia.</p>
+                        <div className="py-8">
+                            <EmptyState 
+                                icon={PackageOpen}
+                                title="Tidak Ada Produk"
+                                description="Anda belum menambahkan satupun produk. Klik tombol 'Add produk' untuk menambahkan data ke katalog."
+                            />
+                        </div>
                     ) : (
                         products.map((product, index) => (
-                            <div ref={index === products.length - 1 ? lastProductElementRef : null} key={`${product.product_id}-${index}`}>
+                            <div ref={index === products.length - 1 ? lastProductElementRef : null} key={`${product.id}-${index}`}>
                                 <ProductCard
                                     onDelete={handleDeleteProduct}
                                     product={{
-                                        product_id: product.product_id,
-                                        products_name: product.products_name,
-                                        products_description: product.products_description,
-                                        categories_id: product.categories_id,
-                                        categories_name: product.categories_name,
+                                        product_id: product.id,
+                                        name: product.name,
+                                        description: product.description,
+                                        category_id: product.category_id,
+                                        name: product.name,
                                         stock: product.stock,
                                         images: product.images,
                                         price_type: product.price_type,

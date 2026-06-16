@@ -1,171 +1,72 @@
 import { NextResponse } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
-import { jwtDecode } from 'jwt-decode';
-import chalk from 'chalk';
+import NextAuth from 'next-auth';
+import { authConfig } from '@/auth.config';
 
-export async function middleware(request) {
-    console.log('masuk middleware');
-    let supabaseResponse = NextResponse.next({
-        request,
-    });
+const { auth } = NextAuth(authConfig);
 
-    try {
-        const supabase = createServerClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL,
-            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-            {
-                cookies: {
-                    getAll() {
-                        return request.cookies.getAll();
-                    },
-                    setAll(cookiesToSet) {
-                        cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value));
-                        supabaseResponse = NextResponse.next({
-                            request,
-                        });
-                        cookiesToSet.forEach(({ name, value, options }) =>
-                            supabaseResponse.cookies.set(name, value, options)
-                        );
-                    },
-                },
-            }
-        );
+export default auth((req) => {
+    const { nextUrl } = req;
+    const isLoggedIn = !!req.auth;
+    const userRole = req.auth?.user?.role; // Dapat bernilai 'admin', 'customer', atau undefined
 
-        // cek user sudah login atau belum dan request ke server supabase
-        // melihat session dan user_role di acces token
-        const url = request.nextUrl.clone();
-        const { data: user } = await supabase.auth.getUser();
-        const { data: { session } } = await supabase.auth.getSession();
+    // console.log('Middleware NextAuth berjalan untuk rute:', nextUrl.pathname);
+    // console.log('Status Login:', isLoggedIn, '| Role:', userRole);
 
-        // inisialisasi user_role
-        let user_role = null;
-        if ((user.user != null) && (session.access_token != null)) {
-            const jwt = jwtDecode(session.access_token);
-            user_role = jwt['user_role'];
-            console.log('ada user dan session');
-            // console.log('access_token:', session.access_token);
+    // Rute Auth (Login & Register) - Sesuai ACL SB001
+    if (nextUrl.pathname.startsWith('/login') || nextUrl.pathname.startsWith('/signup')) {
+        if (isLoggedIn) {
+            console.log('Pengguna sudah login. Mengarahkan ke dashboard');
+            return NextResponse.redirect(new URL(userRole === 'admin' ? '/admin' : '/', nextUrl));
         }
-
-        console.log('berhasil decode acces token');
-        console.log('cek user ?');
-        console.log("User_role:", user_role);
-        // console.log("Get user:", user.user);
-
-        // Check for x-forwarded-proto header
-        const forwardedProto = request.headers.get('x-forwarded-proto');
-        console.log('forwardedProto:', forwardedProto);
-
-        //router admin
-        if (url.pathname.startsWith('/admin')) {
-            console.log('masuk halamanan admin');
-            if (user.user == null) {
-                console.log('user belum login, tidak boleh masuk, arahkan ke /');
-                url.pathname = '/';
-                return NextResponse.redirect(url);
-            } else if (user.user != null) {
-                console.log('user sudah login');
-                if (user_role === 'admin') {
-                    console.log('user adalah admin, boleh masuk');
-                    return NextResponse.next();
-                } else if (user_role === 'customer') {
-                    console.log('user adalah customer, tidak boleh masuk, arahkan ke /');
-                    url.pathname = '/';
-                    return NextResponse.redirect(url);
-                }
-            }
-        }
-
-        // router guest and customer
-        if (url.pathname === '/') {
-            console.log('masuk halamanan /');
-            if (user.user == null) {
-                console.log('user belum login, boleh masuk');
-                return NextResponse.next({ request });
-            } else if (user.user != null) {
-                console.log('user sudah login');
-                if (user_role === 'admin') {
-                    console.log('user adalan admin, pindahkan ke /admin');
-                    url.pathname = '/admin';
-                    return NextResponse.redirect(url);
-                } else if (user_role === 'customer') {
-                    console.log('user adalah customer, masuk halaman /');
-                    return NextResponse.next({ request });
-                }
-            }
-        }
-
-        // router customer
-        if (url.pathname.startsWith('/profile')) {
-            console.log('masuk halamanan /profile');
-            if (user.user == null) {
-                console.log('user belum login, tidak boleh masuk, arahkan ke /login');
-                url.pathname = '/login';
-                return NextResponse.redirect(url);
-            } else if (user.user != null) {
-                console.log('user sudah login');
-                if (user_role === 'admin') {
-                    console.log('user adalan admin,tidak boleh masuk, pindahkan ke /admin');
-                    url.pathname = '/admin';
-                    return NextResponse.redirect(url);
-                } else if (user_role === 'customer') {
-                    console.log('user adalah customer, boleh masuk, arahkan ke /profile');
-                    return NextResponse.next({ request });
-                }
-            }
-        }
-
-        if (url.pathname.startsWith('/orders')) {
-            console.log('masuk halamanan /orders');
-            if (user.user == null) {
-                console.log('user belum login, tidak boleh masuk, arahkan ke /login');
-                url.pathname = '/login';
-                return NextResponse.redirect(url);
-            } else if (user.user != null) {
-                console.log('user sudah login');
-                if (user_role === 'admin') {
-                    console.log('user adalan admin,tidak boleh masuk, pindahkan ke /admin');
-                    url.pathname = '/admin';
-                    return NextResponse.redirect(url);
-                } else if (user_role === 'customer') {
-                    console.log('user adalah customer, boleh masuk, arahkan ke /profile');
-                    return NextResponse.next({ request });
-                }
-            }
-        }
-
-        if (url.pathname.startsWith('/cart')) {
-            console.log('masuk halamanan /cart');
-            if (user.user == null) {
-                console.log('user belum login, tidak boleh masuk, arahkan ke /login');
-                url.pathname = '/login';
-                return NextResponse.redirect(url);
-            } else if (user.user != null) {
-                console.log('user sudah login');
-                if (user_role === 'admin') {
-                    console.log('user adalan admin,tidak boleh masuk, pindahkan ke /admin');
-                    url.pathname = '/admin';
-                    return NextResponse.redirect(url);
-                } else if (user_role === 'customer') {
-                    console.log('user adalah customer, boleh masuk, arahkan ke /profile');
-                    return NextResponse.next({ request });
-                }
-            }
-        }
-    } catch (error) {
-        console.error('Error in middleware:', error);
-        return NextResponse.next();
+        return null; // Izinkan akses
     }
-}
+
+    // Rute Admin
+    if (nextUrl.pathname.startsWith('/admin')) {
+        if (!isLoggedIn) {
+            console.log('Pengguna belum login. Mengarahkan ke /login');
+            return NextResponse.redirect(new URL('/login', nextUrl));
+        }
+        if (userRole !== 'admin') {
+            console.log('Pengguna bukan admin. Mengarahkan ke /');
+            return NextResponse.redirect(new URL('/', nextUrl));
+        }
+        return null; // Izinkan akses
+    }
+
+    // Rute Customer (Keranjang, Profil, Pesanan)
+    if (nextUrl.pathname.startsWith('/profile') || nextUrl.pathname.startsWith('/orders') || nextUrl.pathname.startsWith('/cart')) {
+        if (!isLoggedIn) {
+            console.log('Pengguna belum login. Mengarahkan ke /login');
+            return NextResponse.redirect(new URL('/login', nextUrl));
+        }
+        if (userRole === 'admin') {
+            console.log('Admin tidak boleh masuk ke rute customer. Mengarahkan ke /admin');
+            return NextResponse.redirect(new URL('/admin', nextUrl));
+        }
+        return null; // Izinkan akses
+    }
+
+    // Rute Guest (Halaman Utama / Landing Page)
+    if (nextUrl.pathname === '/') {
+        if (isLoggedIn && userRole === 'admin') {
+            console.log('Admin berada di halaman utama. Mengarahkan ke /admin');
+            return NextResponse.redirect(new URL('/admin', nextUrl));
+        }
+        return null; // Izinkan akses (Guest dan Customer boleh masuk)
+    }
+
+    return null; // Izinkan rute lainnya
+});
 
 export const config = {
     matcher: [
-        // admin
         '/admin/:path*',
-        //customer
         '/profile/:path*',
         '/orders/:path*',
-        //guest and customer
+        '/cart',
+        '/login',
+        '/signup',
         '/',
-        '/cart'
     ],
 };

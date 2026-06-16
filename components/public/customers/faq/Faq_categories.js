@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/shadcnUi/button";
+import { GetCategoriesFaqActionPublic } from "@/app/actions/v2/public/faq/faqCategoriesActions";
 
 export default function FaqCategories({ onSelectCategory, selectedCategory }) {
     const [categories, setCategories] = useState([]);
@@ -10,20 +11,19 @@ export default function FaqCategories({ onSelectCategory, selectedCategory }) {
     useEffect(() => {
         const fetchCategories = async () => {
             try {
-                const response = await fetch("/api/v2/public/faq/categories");
-                const data = await response.json();
+                const data = await GetCategoriesFaqActionPublic();
                 console.log("🚀 ~ fetchCategories ~ data:", data)
 
-                if (data && data.success && Array.isArray(data.data)) {
+                if (data && Array.isArray(data)) {
                     // Map data dari API ke format yang sesuai
                     const formattedCategories = [
                         {
-                            category_id: "all",
-                            category_name: "Semua Pertanyaan",
+                            id: "all",
+                            name: "Semua Pertanyaan",
                         },
-                        ...data.data.map(category => ({
-                            category_id: category.category_id,
-                            category_name: category.category_name,
+                        ...data.map(category => ({
+                            id: category.id,
+                            name: category.name,
                         }))
                     ];
                     setCategories(formattedCategories);
@@ -45,12 +45,12 @@ export default function FaqCategories({ onSelectCategory, selectedCategory }) {
             <h2 className="text-xl font-semibold mb-4">Kategori</h2>
             {categories.map((category) => (
                 <Button
-                    key={category.category_id}
-                    variant={selectedCategory === category.category_id ? "default" : "ghost"}
+                    key={category.id}
+                    variant={selectedCategory === category.id ? "default" : "ghost"}
                     className="w-full justify-start"
-                    onClick={() => onSelectCategory(category.category_id)}
+                    onClick={() => onSelectCategory(category.id)}
                 >
-                    {category.category_name}
+                    {category.name}
                 </Button>
             ))}
         </div>

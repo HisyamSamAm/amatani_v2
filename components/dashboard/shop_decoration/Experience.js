@@ -38,6 +38,7 @@ import ExperiencePreview from './previewcomponent/ExperiencePreview';
 import { SidebarTrigger } from '@/components/shadcnUi/sidebar';
 import { Separator } from '@/components/shadcnUi/separator';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList } from '@/components/shadcnUi/breadcrumb';
+import { GetExperiencesAction, InsertExperienceAction, DeleteExperienceAction } from "@/app/actions/v2/dashboard/admin/sd/experienceActions";
 
 const formSchema = z.object({
     number: z
@@ -61,12 +62,12 @@ export default function Experience() {
 
     const fetchExperiences = async () => {
         try {
-            const response = await fetch('/api/v2/admin/sd/experience');
-            if (!response.ok) {
-                throw new Error('Failed to fetch experiences');
+            const result = await GetExperiencesAction();
+            if (result.success) {
+                setExperiences(result.data);
+            } else {
+                console.error('Failed to fetch experiences:', result.error);
             }
-            const data = await response.json();
-            setExperiences(data.data);
         } catch (error) {
             console.error('Error fetching experiences:', error);
         }
@@ -80,24 +81,14 @@ export default function Experience() {
 
         startTransition(async () => {
             try {
-                const formData = new FormData();
-                formData.append('number', data.number);
-                formData.append('description', data.description);
+                const result = await InsertExperienceAction(data.number, data.description);
 
-                const response = await fetch('/api/v2/admin/sd/experience', {
-                    method: 'POST',
-                    body: formData,
-                });
-
-                if (!response.ok) {
-                    throw new Error('Failed to insert experiences');
+                if (!result.success) {
+                    throw new Error(result.error || 'Failed to insert experiences');
                 }
 
-                const result = await response.json();
-                console.log('Experiences inserted successfully:', result);
-
+                console.log('Experiences inserted successfully:', result.data);
                 toast.success("Data berhasil disimpan!", {
-
                     description: `Berhasil simpan data`,
                     duration: 3000,
                 });
@@ -107,8 +98,7 @@ export default function Experience() {
             } catch (error) {
                 console.error('Error submitting form:', error);
                 toast.error("Gagal menyimpan data", {
-
-                    description: "Terjadi kesalahan saat menyimpan data.",
+                    description: error.message || "Terjadi kesalahan saat menyimpan data.",
                     duration: 3000,
                 });
             }
@@ -120,19 +110,14 @@ export default function Experience() {
 
         startDeleteTransition(async () => {
             try {
-                const response = await fetch(`/api/v2/admin/sd/experience/${experience_id}`, {
-                    method: 'DELETE',
-                });
+                const result = await DeleteExperienceAction(experience_id);
 
-                if (!response.ok) {
-                    throw new Error('Failed to delete experience');
+                if (!result.success) {
+                    throw new Error(result.error || 'Failed to delete experience');
                 }
 
-                const result = await response.json();
-                console.log('Experience deleted successfully:', result);
-
+                console.log('Experience deleted successfully:', result.data);
                 toast.success("Data berhasil dihapus!", {
-
                     description: `Data Statistik telah berhasil dihapus.`,
                     duration: 3000,
                 });
@@ -141,8 +126,7 @@ export default function Experience() {
             } catch (error) {
                 console.error('Error deleting experience:', error);
                 toast.error("Gagal menghapus data", {
-
-                    description: "Terjadi kesalahan saat menghapus data.",
+                    description: error.message || "Terjadi kesalahan saat menghapus data.",
                     duration: 3000,
                 });
             }
@@ -192,7 +176,7 @@ export default function Experience() {
                                             </SheetHeader>
                                             <div className="p-4">
                                                 {experiences.map(stat => (
-                                                    <div key={stat.experience_id} className="flex justify-between items-center mb-4 w-full">
+                                                    <div key={stat.id} className="flex justify-between items-center mb-4 w-full">
                                                         <div>
                                                             <p className="text-sm">{stat.number}</p>
                                                             <p className="text-xs text-gray-500">{stat.description}</p>
@@ -210,7 +194,10 @@ export default function Experience() {
                                                                 </AlertDialogHeader>
                                                                 <AlertDialogFooter>
                                                                     <AlertDialogCancel>Batal</AlertDialogCancel>
-                                                                    <AlertDialogAction onClick={() => handleDelete(stat.experience_id)} disabled={isDeleting}>
+                                                                    <AlertDialogAction onClick={(e) => {
+                                                                        e.preventDefault();
+                                                                        handleDelete(stat.id);
+                                                                    }} disabled={isDeleting}>
                                                                         {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Hapus'}
                                                                     </AlertDialogAction>
                                                                 </AlertDialogFooter>

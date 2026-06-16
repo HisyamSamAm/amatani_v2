@@ -4,6 +4,7 @@ import ProductForm from "@/components/dashboard/product/ProductForm";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/shadcnUi/breadcrumb";
 import { Separator } from "@/components/shadcnUi/separator";
 import { SidebarTrigger } from "@/components/shadcnUi/sidebar";
+import { InsertProductAction } from "@/app/actions/v2/dashboard/admin/products/productsActions";
 // import { toast } from "sonner";
 
 
@@ -14,12 +15,15 @@ export default function AddProductPage() {
         // const toastId = toast.loading("Sedang memperbarui produk...");
 
         const formData = new FormData();
-        formData.append('products_name', params.products_name);
-        formData.append('products_description', params.products_description);
+        formData.append('name', params.products_name);
+        formData.append('description', params.products_description);
         formData.append('stock', params.stock);
         formData.append('fixed_price', params.fixed_price);
         formData.append('price_type', params.price_type);
-        formData.append('category', JSON.stringify(params.category));
+        formData.append('category', JSON.stringify({
+            category_id: params.category.categories_id,
+            name: params.category.categories_name
+        }));
         formData.append('wholesalePrices', JSON.stringify(params.wholesalePrices));
 
         params.product_images.forEach((image) => {
@@ -27,20 +31,15 @@ export default function AddProductPage() {
         });
 
         try {
-            const result = await fetch('/api/v2/admin/products', {
-                method: 'POST',
-                body: formData
-            });
+            const data = await InsertProductAction(formData);
 
-            const data = await result.json();
-
-            if (result.ok) {
+            if (data && !data.error) {
                 // Menampilkan toast sukses dengan sonner
                 // toast.success("Produk berhasil diperbarui", { id: toastId });
                 return { success: true, data };
             }
 
-            throw new Error(data.message || "Gagal menambahkan produk");
+            throw new Error(data?.error || "Gagal menambahkan produk");
         } catch (error) {
             console.error(`Gagal menambahkan produk:`, error);
             // toast.error(error.message || "Gagal memperbarui produk", { id: toastId });

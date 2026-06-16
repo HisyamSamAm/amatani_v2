@@ -1,19 +1,19 @@
 import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import { AspectRatio } from "@/components/shadcnUi/aspect-ratio"
+import { GetServiceAction } from "@/app/actions/v2/dashboard/admin/sd/serviceActions";
 
 export default function ServicePreview({ refresh }) {
     const [features, setFeatures] = useState([]);
 
-    // Fungsi untuk mengambil data jasa dari API
     const fetchJasaData = async () => {
         try {
-            const response = await fetch('/api/v2/admin/sd/service');
-            if (!response.ok) {
-                throw new Error('Failed to fetch jasa data');
+            const result = await GetServiceAction();
+            if (result.success) {
+                setFeatures(result.data);
+            } else {
+                console.error('Failed to fetch jasa data:', result.error);
             }
-            const data = await response.json();
-            setFeatures(data.data);
         } catch (error) {
             console.error('Error fetching jasa data:', error);
         }
@@ -41,14 +41,14 @@ export default function ServicePreview({ refresh }) {
                     </span>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full">
-                    {features.map((feature, index) => (
+                    {features.map((feature) => (
                         <div
-                            key={index}
+                            key={feature.id}
                             className="relative group flex flex-col items-center overflow-hidden w-full md:w-full"
                         >
                             <AspectRatio ratio={1 / 2} className="w-full ">
                                 <Image
-                                    src={`https://xmlmcdfzbwjljhaebzna.supabase.co/storage/v1/object/public/${feature.image_path}`}
+                                    src={feature.image_path}
                                     alt="Jasa Gratis"
                                     fill
                                     className="object-cover"
@@ -56,7 +56,7 @@ export default function ServicePreview({ refresh }) {
                                 />
                             </AspectRatio>
                             <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-white text-gray-800 text-sm font-semibold py-1 px-4 rounded-full shadow-md">
-                                {feature.service_name}
+                                {feature.name}
                             </div>
                         </div>
                     ))}

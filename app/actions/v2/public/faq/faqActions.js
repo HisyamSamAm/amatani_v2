@@ -2,10 +2,7 @@
 
 import sql from "@/lib/postgres";
 
-export async function GetFaqActionPublic(req, params) {
-    const searchParams = req.nextUrl.searchParams;
-    const category = searchParams.get('category');
-    const search = searchParams.get('search');
+export async function GetFaqActionPublic({ category, search } = {}) {
 
     try {
         let faqs;
@@ -13,15 +10,15 @@ export async function GetFaqActionPublic(req, params) {
             // Cari FAQ berdasarkan kategori dan kata kunci pencarian
             faqs = await sql`
                 SELECT
-                    f.faq_id,
+                    f.id,
                     f.title,
                     f.content,
-                    c.category_id,
-                    c.category_name,
+                    c.id,
+                    c.name,
                     f.created_at
                 FROM faq f
-                LEFT JOIN faq_category c ON f.category_id = c.category_id
-                WHERE c.category_name ILIKE ${'%' + category + '%'}
+                LEFT JOIN faq_category c ON f.category_id = c.id
+                WHERE c.name ILIKE ${'%' + category + '%'}
                   AND (f.title ILIKE ${'%' + search + '%'} OR f.content ILIKE ${'%' + search + '%'})
                 ORDER BY f.created_at DESC
             `;
@@ -29,29 +26,29 @@ export async function GetFaqActionPublic(req, params) {
             // Cari FAQ berdasarkan kategori
             faqs = await sql`
                 SELECT
-                    f.faq_id,
+                    f.id,
                     f.title,
                     f.content,
-                    c.category_id,
-                    c.category_name,
+                    c.id,
+                    c.name,
                     f.created_at
                 FROM faq f
-                LEFT JOIN faq_category c ON f.category_id = c.category_id
-                WHERE c.category_name ILIKE ${'%' + category + '%'}
+                LEFT JOIN faq_category c ON f.category_id = c.id
+                WHERE c.name ILIKE ${'%' + category + '%'}
                 ORDER BY f.created_at DESC
             `;
         } else if (search) {
             // Cari FAQ berdasarkan kata kunci pencarian
             faqs = await sql`
                 SELECT
-                    f.faq_id,
+                    f.id,
                     f.title,
                     f.content,
-                    c.category_id,
-                    c.category_name,
+                    c.id,
+                    c.name,
                     f.created_at
                 FROM faq f
-                LEFT JOIN faq_category c ON f.category_id = c.category_id
+                LEFT JOIN faq_category c ON f.category_id = c.id
                 WHERE (f.title ILIKE ${'%' + search + '%'} OR f.content ILIKE ${'%' + search + '%'})
                 ORDER BY f.created_at DESC
             `;
@@ -59,14 +56,14 @@ export async function GetFaqActionPublic(req, params) {
             // Ambil semua FAQ
             faqs = await sql`
                 SELECT
-                    f.faq_id,
+                    f.id,
                     f.title,
                     f.content,
-                    c.category_id,
-                    c.category_name,
+                    c.id,
+                    c.name,
                     f.created_at
                 FROM faq f
-                LEFT JOIN faq_category c ON f.category_id = c.category_id
+                LEFT JOIN faq_category c ON f.category_id = c.id
                 ORDER BY f.created_at DESC
             `;
         }

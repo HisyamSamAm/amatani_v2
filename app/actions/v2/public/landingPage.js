@@ -40,14 +40,14 @@ export async function GetAllProductPublic() {
     try {
         const result = await sql`
             SELECT 
-                c.categories_id,
-                c.categories_name,
+                c.id,
+                c.name,
                 (
                     SELECT json_agg(
                         json_build_object(
-                            'product_id', p.product_id,
-                            'products_name', p.products_name,
-                            'products_description', p.products_description,
+                            'product_id', p.id,
+                            'name', p.name,
+                            'description', p.description,
                             'stock', p.stock,
                             'created_at', p.created_at,
                             'price_type', p.price_type,
@@ -61,23 +61,23 @@ export async function GetAllProductPublic() {
                                     )
                                 )
                                 FROM wholesale_prices w
-                                WHERE w.product_id = p.product_id
+                                WHERE w.product_id = p.id
                             ),
                             'images', (
                                 SELECT json_agg(pi.image_path)
                                 FROM product_images pi
-                                WHERE pi.product_id = p.product_id
+                                WHERE pi.product_id = p.id
                             )
                         )
                     )
                     FROM products p
-                    LEFT JOIN fixed_prices f ON p.product_id = f.product_id AND p.price_type = 'fixed'
-                    WHERE p.categories_id = c.categories_id
+                    LEFT JOIN fixed_prices f ON p.id = f.product_id AND p.price_type = 'fixed'
+                    WHERE p.category_id = c.id
                 ) AS products
             FROM categories c
-            ORDER BY c.categories_id
+            ORDER BY c.id
         `;
-        console.log("🚀 ~ GetAllProductPublic ~ result:", result)
+        // console.log("🚀 ~ GetAllProductPublic ~ result:", result)
         return { success: true, data: result };
     } catch (error) {
         console.error("Database connection failed:", error);
@@ -88,14 +88,14 @@ export async function GetKategoriPanganActionPublic() {
     try {
         const result = await sql`
             SELECT 
-                lfc.food_categories_id,
+                lfc.id,
                 lfc.image_path,
-                c.categories_id,
-                c.categories_name
+                c.id,
+                c.name
             FROM lp_food_categories lfc
-            JOIN categories c ON lfc.categories_id = c.categories_id;
+            JOIN categories c ON lfc.category_id = c.id;
         `;
-        console.log("🚀 ~ GetKategoriPanganActionPublic ~ result:", result);
+        // console.log("🚀 ~ GetKategoriPanganActionPublic ~ result:", result);
         return { success: true, data: result };
     } catch (error) {
         console.error('Error getting categories:', error);
@@ -107,7 +107,7 @@ export async function GetServiceActionPublic() {
         const result = await sql`
             SELECT * FROM lp_service;
         `;
-        console.log("🚀 ~ GetServiceActionPublic ~ result:", result);
+        // console.log("🚀 ~ GetServiceActionPublic ~ result:", result);
         return { success: true, data: result };
     } catch (error) {
         console.error('Error getting service:', error);

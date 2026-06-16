@@ -10,7 +10,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/shad
 import { usePathname } from 'next/navigation';
 import Image from "next/image";
 import { useCart } from "./CartContext";
-import { Logout } from "@/api v1/actions v1/v1/Auth"
+import { signOut } from "next-auth/react";
 
 export default function Navbar({ isAuthenticated }) {
 
@@ -106,7 +106,7 @@ export default function Navbar({ isAuthenticated }) {
 
                     {/* Auth Buttons */}
                     {isAuthenticated ? (
-                        <Button onClick={() => { Logout() }} className="hidden md:block bg-rose-600 text-white rounded-md hover:bg-rose-700">
+                        <Button onClick={() => signOut({ callbackUrl: '/' })} className="hidden md:block bg-rose-600 text-white rounded-md hover:bg-rose-700">
                             Logout
                         </Button>
                     ) : (

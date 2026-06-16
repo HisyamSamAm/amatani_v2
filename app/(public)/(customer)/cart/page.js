@@ -12,6 +12,10 @@ import { useCart } from '@/components/public/customers/Navbar/CartContext'
 import { Trash2 } from 'lucide-react'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/shadcnUi/alert-dialog'
 import { Skeleton } from "@/components/shadcnUi/skeleton"
+import { EmptyState } from "@/components/shadcnUi/empty-state"
+import { ShoppingCart } from "lucide-react"
+import { GetCartActionCustomers, DeleteCartItemCustomer, QuantityChangeCartCustomer } from '@/app/actions/v2/customer/cartActions'
+import { toast } from 'sonner'
 
 export default function CartPage() {
     const [cartData, setCartData] = useState(null);
@@ -24,11 +28,13 @@ export default function CartPage() {
         async function fetchCart() {
             setIsLoading(true); // Set loading true saat fetch dimulai
             try {
-                const res = await fetch(`/api/v2/customer/cart/${userId}`);
-                const json = await res.json();
-                console.log("🚀 ~ fetchCart ~ json: berasil api", json);
+                if (!userId) return;
+                const json = await GetCartActionCustomers({ user_id: userId });
+
                 setCartData(json);
-                setCartItems(json.data.items.map(item => ({ ...item, isSelected: false })));
+                if (json.data && json.data.items) {
+                    setCartItems(json.data.items.map(item => ({ ...item, isSelected: false })));
+                }
             } catch (error) {
                 console.error('Fetch cart error:', error);
             } finally {
@@ -38,19 +44,13 @@ export default function CartPage() {
         fetchCart();
     }, [userId]);
 
-    const removeItem = async (cart_items_id) => {
+    const removeItem = async (id) => {
         try {
-            const response = await fetch(`/api/v2/customer/cart/${userId}`, {
-                method: 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ cart_items_id }),
-            });
+            const response = await DeleteCartItemCustomer({ id, user_id: userId });
 
-            if (response.ok) {
+            if (response.success) {
                 // Jika berhasil dihapus, update state lokal
-                setCartItems(cartItems.filter(item => item.cart_items_id !== cart_items_id));
+                setCartItems(cartItems.filter(item => item.id !== id));
                 toast.success("Item removed successfully");
                 fetchCartCount(userId)
             } else {
@@ -64,7 +64,7 @@ export default function CartPage() {
 
     const updateQuantity = (id, newQuantity) => {
         setCartItems(cartItems.map(item =>
-            item.cart_items_id === id ? { ...item, quantity: Math.max(1, Math.min(newQuantity, item.stock)) } : item
+            item.id === id ? { ...item, quantity: Math.max(1, Math.min(newQuantity, item.stock)) } : item
         ))
 
         // Clear previous timeout
@@ -81,15 +81,9 @@ export default function CartPage() {
 
     const updateQuantityInDatabase = async (id, newQuantity) => {
         try {
-            const response = await fetch(`/api/v2/customer/cart/${userId}/quantity`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ cart_items_id: id, quantity: newQuantity }),
-            });
+            const response = await QuantityChangeCartCustomer({ id: id, quantity: newQuantity, user_id: userId });
 
-            if (!response.ok) {
+            if (!response.success) {
                 throw new Error('Failed to update quantity')
             }
         } catch (error) {
@@ -100,13 +94,13 @@ export default function CartPage() {
 
     const handleQuantityChange = (id, value) => {
         setCartItems(cartItems.map(item =>
-            item.cart_items_id === id ? { ...item, quantity: value === '' ? '' : Math.max(1, Math.min(parseInt(value, 10), item.stock)) } : item
+            item.id === id ? { ...item, quantity: value === '' ? '' : Math.max(1, Math.min(parseInt(value, 10), item.stock)) } : item
         ))
     }
 
     const toggleSelection = (id) => {
         setCartItems(cartItems.map(item =>
-            item.cart_items_id === id ? { ...item, isSelected: !item.isSelected } : item
+            item.id === id ? { ...item, isSelected: !item.isSelected } : item
         ))
     }
 
@@ -147,7 +141,7 @@ export default function CartPage() {
                 const itemSavings = regularPrice - wholesalePrice;
                 if (itemSavings > 0) {
                     savings.push({
-                        name: item.products_name,
+                        name: item.name,
                         quantity: item.quantity,
                         regularPrice,
                         wholesalePrice,
@@ -228,11 +222,11 @@ export default function CartPage() {
             <div className="flex flex-col md:flex-row gap-4">
                 <div className="w-full md:w-2/3">
                     {cartItems.map((item) => (
-                        <Card key={item.cart_items_id} className="mb-4">
+                        <Card key={item.id} className="mb-4">
                             <CardContent className="flex flex-col lg:flex-row items-start lg:items-center justify-between p-4 relative">
                                 {/* Kolom Kiri (Produk) */}
                                 <div className="flex flex-row items-center lg:items-center w-full lg:w-auto">
-                                    {item.product_id === null ? (
+                                    {item.id === null ? (
                                         <>
                                             <div
                                                 className="w-24 h-24 bg-gray-400 rounded-md mr-4 ml-8"
@@ -249,7 +243,7 @@ export default function CartPage() {
                                             {item.stock !== 0 && item.stock !== null ? (
                                                 <Checkbox
                                                     checked={item.isSelected}
-                                                    onCheckedChange={() => toggleSelection(item.cart_items_id)}
+                                                    onCheckedChange={() => toggleSelection(item.id)}
                                                     className=""
                                                 />
                                             ) : (
@@ -260,15 +254,17 @@ export default function CartPage() {
                                                 />
                                             )}
                                             <Image
-                                                src={`https://xmlmcdfzbwjljhaebzna.supabase.co/storage/v1/object/public/${item.product_images[0].image_path}`}
-                                                alt={item.products_name}
+                                                src={item.product_images?.[0]?.image_path?.startsWith('http') 
+                                                    ? item.product_images[0].image_path 
+                                                    : "/placeholder-image.png"}
+                                                alt={item.name}
                                                 width={100}
                                                 height={100}
                                                 className={`rounded-md m-4 flex items-center ${item.stock === 0 || item.stock === null ? 'grayscale' : ''}`}
                                             />
                                             <div className="flex-grow">
                                                 <h2 className={`text-lg font-semibold ${item.stock === 0 || item.stock === null ? 'text-rose-600' : ''}`}>
-                                                    {item.stock === 0 || item.stock === null ? 'Produk sudah habis' : item.products_name}
+                                                    {item.stock === 0 || item.stock === null ? 'Produk sudah habis' : item.name}
                                                 </h2>
                                                 <p className="text-gray-600">
                                                     {item.price_type === 'fixed'
@@ -299,21 +295,21 @@ export default function CartPage() {
 
                                 {/* Kolom Kanan (Kontrol Kuantitas dan Hapus) */}
                                 <div className="flex justify-end items-center mt-4 lg:mt-0 ml-auto w-full lg:w-auto">
-                                    {item.product_id !== null && item.stock !== 0 && item.stock !== null && (
+                                    {item.id !== null && item.stock !== 0 && item.stock !== null && (
                                         <div className="flex flex-row items-center space-x-2 md:w-auto">
                                             <Button
                                                 variant="outline"
                                                 size="sm"
-                                                onClick={() => updateQuantity(item.cart_items_id, item.quantity - 1)}
+                                                onClick={() => updateQuantity(item.id, item.quantity - 1)}
                                             >
                                                 -
                                             </Button>
                                             <Input
                                                 value={item.quantity === '' ? '' : item.quantity}
-                                                onChange={(e) => handleQuantityChange(item.cart_items_id, e.target.value)}
+                                                onChange={(e) => handleQuantityChange(item.id, e.target.value)}
                                                 onBlur={(e) => {
                                                     if (e.target.value === '') {
-                                                        updateQuantity(item.cart_items_id, 1);
+                                                        updateQuantity(item.id, 1);
                                                     }
                                                 }}
                                                 className="w-16 text-center"
@@ -321,7 +317,7 @@ export default function CartPage() {
                                             <Button
                                                 variant="outline"
                                                 size="sm"
-                                                onClick={() => updateQuantity(item.cart_items_id, item.quantity + 1)}
+                                                onClick={() => updateQuantity(item.id, item.quantity + 1)}
                                             >
                                                 +
                                             </Button>
@@ -342,7 +338,7 @@ export default function CartPage() {
                                             </AlertDialogHeader>
                                             <AlertDialogFooter>
                                                 <AlertDialogCancel>Batal</AlertDialogCancel>
-                                                <AlertDialogAction onClick={() => removeItem(item.cart_items_id)}>
+                                                <AlertDialogAction onClick={() => removeItem(item.id)}>
                                                     Hapus
                                                 </AlertDialogAction>
                                             </AlertDialogFooter>
@@ -368,8 +364,8 @@ export default function CartPage() {
                                 const savings = regularPrice - totalPrice;
 
                                 return (
-                                    <div key={item.cart_items_id} className="flex justify-between mb-2">
-                                        <span>{item.products_name} (x{item.quantity})</span>
+                                    <div key={item.id} className="flex justify-between mb-2">
+                                        <span>{item.name} (x{item.quantity})</span>
                                         <span>
                                             {savings > 0 ? (
                                                 <>
@@ -435,12 +431,19 @@ export default function CartPage() {
 // EmptyCart Component
 function EmptyCart() {
     return (
-        <div className="flex flex-col items-center justify-center h-screen">
-            <h1 className="text-2xl font-bold mb-4">Keranjang Belanja Kosong</h1>
-            <p className="text-gray-600 mb-8">Tambah produk ke keranjang untuk mulai belanja!</p>
-            <Link href="/">
-                <Button className="bg-red-500 text-white hover:bg-red-600">Belanja Sekarang</Button>
-            </Link>
+        <div className="container max-w-full mx-auto px-4 md:px-16 mt-8">
+            <EmptyState 
+                icon={ShoppingCart}
+                title="Keranjang Anda Kosong"
+                description="Sepertinya Anda belum menambahkan produk apapun ke keranjang. Mari temukan produk segar terbaik kami."
+                action={
+                    <Link href="/">
+                        <Button className="bg-rose-600 text-white hover:bg-rose-700 rounded-full px-8">
+                            Mulai Belanja
+                        </Button>
+                    </Link>
+                }
+            />
         </div>
     );
 }

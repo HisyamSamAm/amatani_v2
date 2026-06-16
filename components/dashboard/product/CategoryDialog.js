@@ -3,7 +3,7 @@
 import { Toaster, toast } from "sonner";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/shadcnUi/alert-dialog";
 import { Button } from "@/components/shadcnUi/button";
-import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/shadcnUi/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger, DialogHeader } from "@/components/shadcnUi/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/shadcnUi/form";
 import { Input } from "@/components/shadcnUi/input";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -12,6 +12,7 @@ import { useEffect, useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { ScrollArea } from "@/components/shadcnUi/scroll-area";
+import { GetCategoriesAction, InsertCategoryAction, DeleteCategoryAction } from "@/app/actions/v2/dashboard/admin/products/categoriesActions";
 
 const formschema = z.object({
     categories_name: z.string().min(1, { message: 'Jangan lupa di isi' })
@@ -32,8 +33,7 @@ export default function ManageCategoriesDialog() {
 
     const fetchCategories = async () => {
         try {
-            const response = await fetch('/api/v2/admin/products/categories');
-            const result = await response.json();
+            const result = await GetCategoriesAction();
             if (result.success && Array.isArray(result.data)) {
                 setCategories(result.data);
             } else {
@@ -48,23 +48,16 @@ export default function ManageCategoriesDialog() {
     const onSubmit = (params) => {
         startAdding(async () => {
             try {
-                const formData = new FormData();
-                formData.append('categories_name', params.categories_name);
+                const result = await InsertCategoryAction(params.categories_name);
 
-                const result = await fetch('/api/v2/admin/products/categories', {
-                    method: 'POST',
-                    body: formData,
-                });
-
-                if (!result.ok) throw new Error('Failed to add category');
-                await result.json();
+                if (!result.success) throw new Error(result.error || 'Failed to add category');
 
                 fetchCategories();
                 form.reset();
                 toast.success("Category added successfully!", { duration: 3000 });
             } catch (error) {
                 console.error('Error adding category:', error);
-                toast.error("Failed to add category.", { duration: 3000 });
+                toast.error(error.message || "Failed to add category.", { duration: 3000 });
             }
         });
     };
@@ -73,18 +66,15 @@ export default function ManageCategoriesDialog() {
         setPendingCategoryId(categoryId);
         startDeleting(async () => {
             try {
-                const response = await fetch(`/api/v2/admin/products/categories/${categoryId}`, {
-                    method: 'DELETE',
-                });
+                const result = await DeleteCategoryAction(categoryId);
 
-                if (!response.ok) throw new Error('Failed to delete category');
-                await response.json();
+                if (!result.success) throw new Error(result.error || 'Failed to delete category');
 
                 fetchCategories();
                 toast.success(`Category "${categoryName}" deleted successfully.`, { duration: 3000 });
             } catch (error) {
                 console.error('Failed to delete category:', error);
-                toast.error("Failed to delete category.", { duration: 3000 });
+                toast.error(error.message || "Failed to delete category.", { duration: 3000 });
             } finally {
                 setPendingCategoryId(null);
             }
@@ -105,10 +95,10 @@ export default function ManageCategoriesDialog() {
                     </Button>
                 </DialogTrigger>
                 <DialogContent>
-                    <AlertDialogHeader>
+                    <DialogHeader>
                         <DialogTitle>Manage Your Categories</DialogTitle>
                         <DialogDescription>Add or delete categories for your products.</DialogDescription>
-                    </AlertDialogHeader>
+                    </DialogHeader>
 
                     <Form {...form}>
                         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2">
@@ -148,18 +138,18 @@ export default function ManageCategoriesDialog() {
                         <div className="space-y-2">
                             {Array.isArray(categories) && categories.map((category) => (
                                 <div
-                                    key={category.categories_id}
+                                    key={category.id}
                                     className="flex items-center justify-between p-2 border rounded-md"
                                 >
-                                    <p className="text-sm">{category.categories_name}</p>
+                                    <p className="text-sm">{category.name}</p>
                                     <AlertDialog>
                                         <AlertDialogTrigger asChild>
                                             <Button
                                                 variant="outline"
                                                 className="w-8 h-8 flex items-center justify-center"
-                                                disabled={isDeleting && pendingCategoryId === category.categories_id}
+                                                disabled={isDeleting && pendingCategoryId === category.id}
                                             >
-                                                {isDeleting && pendingCategoryId === category.categories_id ? (
+                                                {isDeleting && pendingCategoryId === category.id ? (
                                                     <Loader2 className="w-4 h-4 text-red-500 animate-spin" />
                                                 ) : (
                                                     <Trash className="w-4 h-4 text-red-500" />
@@ -176,7 +166,7 @@ export default function ManageCategoriesDialog() {
                                             <AlertDialogFooter>
                                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                                                 <AlertDialogAction
-                                                    onClick={() => handleDeleteCategory(category.categories_id, category.categories_name)}
+                                                    onClick={() => handleDeleteCategory(category.id, category.name)}
                                                 >
                                                     Delete
                                                 </AlertDialogAction>

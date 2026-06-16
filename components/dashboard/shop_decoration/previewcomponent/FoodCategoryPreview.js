@@ -4,18 +4,19 @@ import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import { AspectRatio } from "@/components/shadcnUi/aspect-ratio";
 import { ScrollArea, ScrollBar } from "@/components/shadcnUi/scroll-area";
+import { GetFoodCategoriesAction } from "@/app/actions/v2/dashboard/admin/sd/foodCategories";
 
 export default function FoodCategoryPreview({ refresh }) {
     const [categories, setCategories] = useState([]);
 
     const fetchCategories = async () => {
         try {
-            const response = await fetch('/api/v2/admin/sd/food_categories');
-            if (!response.ok) {
-                throw new Error('Failed to fetch categories');
+            const result = await GetFoodCategoriesAction();
+            if (result.success) {
+                setCategories(result.data);
+            } else {
+                console.error('Failed to fetch categories:', result.error);
             }
-            const data = await response.json();
-            setCategories(data.data);
         } catch (error) {
             console.error('Error fetching categories:', error);
         }
@@ -38,7 +39,7 @@ export default function FoodCategoryPreview({ refresh }) {
                         {Array.isArray(categories) && categories.map((category, index) => (
                             <ProductCard
                                 key={index}
-                                imageSrc={`https://xmlmcdfzbwjljhaebzna.supabase.co/storage/v1/object/public/${category.image_path}`}
+                                imageSrc={category.image_path}
                                 categoryName={category.categories_name}
                             />
                         ))}

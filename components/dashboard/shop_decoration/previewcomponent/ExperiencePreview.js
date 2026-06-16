@@ -1,17 +1,17 @@
 import React, { useEffect, useState } from "react";
+import { GetExperiencesAction } from "@/app/actions/v2/dashboard/admin/sd/experienceActions";
 
 export default function ExperiencePreview({ fetchStatistics }) {
     const [stats, setStats] = useState([]);
 
-    // Fungsi untuk mengambil data statistik dari API
     const fetchStatisticsInternal = async () => {
         try {
-            const response = await fetch('/api/v2/admin/sd/experience');
-            if (!response.ok) {
-                throw new Error('Failed to fetch statistics');
+            const result = await GetExperiencesAction();
+            if (result.success) {
+                setStats(result.data);
+            } else {
+                console.error('Failed to fetch statistics:', result.error);
             }
-            const data = await response.json();
-            setStats(data.data);
         } catch (error) {
             console.error('Error fetching statistics:', error);
         }

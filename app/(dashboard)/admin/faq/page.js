@@ -43,6 +43,8 @@ import {
     SelectValue,
 } from "@/components/shadcnUi/select";
 import { toast } from "sonner";
+import { GetFaqAction, DeleteFaqAction } from "@/app/actions/v2/dashboard/admin/faq/faqActions";
+import { GetCategoriesFaqAction } from "@/app/actions/v2/dashboard/admin/faq/categoriesActions";
 
 export default function FaqPage() {
     const [faqItems, setFaqItems] = useState([]);
@@ -56,26 +58,11 @@ export default function FaqPage() {
     // Function to fetch FAQs based on category and search query
     const fetchFaqs = async (category = "", query = "") => {
         try {
-            // Build the query string based on the category and query parameters
-            const params = new URLSearchParams();
-            if (category) {
-                params.append("category", category);
-            }
-            if (query) {
-                params.append("search", query);
-            }
-
-            // Construct the URL with the query parameters
-            const url = `/api/v2/admin/faq${params.toString() ? `?${params.toString()}` : ""
-                }`;
-            console.log("🚀 ~ fetchFaqs ~ url:", url);
-
-            const response = await fetch(url);
-            const result = await response.json();
-            if (result.success && Array.isArray(result.data)) {
-                setFaqItems(result.data);
+            const data = await GetFaqAction({ category, search: query });
+            if (Array.isArray(data)) {
+                setFaqItems(data);
             } else {
-                console.error("FAQs data is not an array:", result);
+                console.error("FAQs data is not an array:", data);
                 setFaqItems([]);
             }
         } catch (error) {
@@ -88,12 +75,11 @@ export default function FaqPage() {
     // Function to fetch categories
     const fetchCategories = async () => {
         try {
-            const response = await fetch("/api/v2/admin/faq/categories");
-            const result = await response.json();
-            if (result.success && Array.isArray(result.data)) {
-                setCategories(result.data);
+            const data = await GetCategoriesFaqAction();
+            if (Array.isArray(data)) {
+                setCategories(data);
             } else {
-                console.error("Categories data is not an array:", result);
+                console.error("Categories data is not an array:", data);
                 setCategories([]);
             }
         } catch (error) {
@@ -110,16 +96,12 @@ export default function FaqPage() {
         setPendingDeleteId(faqId);
         startTransition(async () => {
             try {
-                const response = await fetch(`/api/v2/admin/faq/${faqId}`, {
-                    method: "DELETE",
-                });
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.message || "Failed to delete FAQ");
+                const res = await DeleteFaqAction(faqId);
+                if (res && res.error) {
+                    throw new Error(res.error);
                 }
-                await response.json();
                 setFaqItems((prevFaqs) =>
-                    prevFaqs.filter((faq) => faq.faq_id !== faqId)
+                    prevFaqs.filter((faq) => faq.id !== faqId)
                 );
                 toast.success("The FAQ has been successfully deleted.");
                 setLoading(true); // Start skeleton loading
@@ -217,8 +199,8 @@ export default function FaqPage() {
                             </SelectTrigger>
                             <SelectContent>
                                 {categories.map((category) => (
-                                    <SelectItem key={category.category_id} value={category.category_id}>
-                                        {category.category_name}
+                                    <SelectItem key={category.id} value={category.id.toString()}>
+                                        {category.name}
                                     </SelectItem>
                                 ))}
                             </SelectContent>
@@ -249,19 +231,19 @@ export default function FaqPage() {
                                 <Accordion type="single" collapsible className="w-full">
                                     {faqItems.map((faq) => (
                                         <AccordionItem
-                                            key={faq.faq_id}
-                                            value={`item-${faq.faq_id}`}
+                                            key={faq.id}
+                                            value={`item-${faq.id}`}
                                             className="border-b"
                                         >
                                             <div className="flex items-center justify-between">
                                                 <AccordionTrigger className="flex-grow text-left flex items-center">
                                                     {faq.title}
                                                     <Badge className="ml-2 bg-rose-100 text-rose-600 hover:bg-rose-200">
-                                                        {faq.category_name || "tidak ada kategori"}
+                                                        {faq.name || "tidak ada kategori"}
                                                     </Badge>
                                                 </AccordionTrigger>
                                                 <div className="flex space-x-3">
-                                                    <Link href={`/admin/faq/edit/${faq.faq_id}`} passHref>
+                                                    <Link href={`/admin/faq/edit/${faq.id}`} passHref>
                                                         <Button
                                                             variant="outline"
                                                             className="flex items-center justify-center px-3 py-2 sm:px-4 sm:py-2 rounded-md"
@@ -275,9 +257,9 @@ export default function FaqPage() {
                                                             <Button
                                                                 variant="outline"
                                                                 className="flex items-center justify-center w-9 h-9 rounded-md relative"
-                                                                disabled={pendingDeleteId === faq.faq_id}
+                                                                disabled={pendingDeleteId === faq.id}
                                                             >
-                                                                {pendingDeleteId === faq.faq_id ? (
+                                                                {pendingDeleteId === faq.id ? (
                                                                     <Loader2 className="w-4 h-4 animate-spin" />
                                                                 ) : (
                                                                     <Trash className="w-5 h-5" />
@@ -295,7 +277,10 @@ export default function FaqPage() {
                                                             <AlertDialogFooter>
                                                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                                                                 <AlertDialogAction
-                                                                    onClick={() => handleDeleteFaq(faq.faq_id)}
+                                                                    onClick={(e) => {
+                                                                        e.preventDefault();
+                                                                        handleDeleteFaq(faq.id);
+                                                                    }}
                                                                 >
                                                                     Delete
                                                                 </AlertDialogAction>

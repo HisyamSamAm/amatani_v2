@@ -4,11 +4,12 @@ import FaqForm from "@/components/dashboard/faq/FaqForm";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/shadcnUi/breadcrumb";
 import { Separator } from "@/components/shadcnUi/separator";
 import { SidebarTrigger } from "@/components/shadcnUi/sidebar";
-import { useRouter } from 'next/navigation'
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { InsertFaqAction } from "@/app/actions/v2/dashboard/admin/faq/faqActions";
 
 export default function AddFaqPage() {
-    const router = useRouter()
+    const router = useRouter();
     const handleAddFaq = async (params) => {
         console.log('Adding FAQ:', params);
         const formData = new FormData();
@@ -17,19 +18,14 @@ export default function AddFaqPage() {
         formData.append('category_id', params.category.category_id);
 
         try {
-            const result = await fetch('/api/v2/admin/faq', {
-                method: 'POST',
-                body: formData
-            });
+            const data = await InsertFaqAction(formData);
 
-            if (result.ok) {
-                const data = await result.json();
+            if (data && !data.error) {
                 console.log('result =', data);
                 console.log('FAQ berhasil ditambahkan');
             } else {
-                const errorData = await result.json();
-                console.error('Error:', errorData);
-                toast.error("Failed to add FAQ");
+                console.error('Error:', data?.error);
+                toast.error(data?.error || "Failed to add FAQ");
             }
         } catch (error) {
             console.error('Error:', error);

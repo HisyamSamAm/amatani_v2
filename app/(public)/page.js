@@ -8,6 +8,11 @@ import SearchHomeCustomer from "@/components/public/customers/SearchProduct";
 import FeatureGrid from "@/components/public/customers/FeatureGrid";
 import Experience from "@/components/public/customers/Experience";
 
+export const metadata = {
+  title: "Amatani | Sumber Segar Untuk Usaha Anda",
+  description: "Platform penyedia produk pertanian dan pangan segar untuk kebutuhan ritel dan grosir Anda.",
+};
+
 export default function CustomerPage() {
     return (
         <div>
